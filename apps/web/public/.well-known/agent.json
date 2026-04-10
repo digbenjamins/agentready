@@ -1,0 +1,28 @@
+{
+  "name": "AgentReady",
+  "description": "Checks if a website is discoverable by AI agents like ChatGPT, Grok, Perplexity, Gemini, Claude, and Copilot.",
+  "url": "https://agentready.dev",
+  "capabilities": [
+    {
+      "name": "website-check",
+      "description": "Scan a website for AI agent discoverability signals",
+      "endpoint": "/api/check",
+      "method": "POST",
+      "content_type": "application/json",
+      "parameters": {
+        "email": {
+          "type": "string",
+          "required": true,
+          "description": "Email to receive the report"
+        },
+        "website": {
+          "type": "string",
+          "required": true,
+          "description": "URL of the website to check"
+        }
+      }
+    }
+  ],
+  "skill_file": "/skill.md",
+  "contact": "hello@agentready.dev"
+}

@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm view:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx next:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(npx tsc:*)",
+      "Bash(rm -f D:/agentready/packages/database/supabase-migration.sql)",
+      "Bash(rm -rf node_modules package-lock.json)",
+      "Bash(npm run:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(node -e ':*)",
+      "Bash(curl -s \"http://localhost:5555/api/submissions\")",
+      "Bash(kill %1)",
+      "Bash(curl -s \"https://api.perplexity.ai\" -o /dev/null -w \"%{http_code}\")",
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)",
+      "WebFetch(domain:developers.openai.com)",
+      "WebFetch(domain:docs.perplexity.ai)",
+      "WebFetch(domain:ziptie.dev)",
+      "Bash(wc:*)",
+      "Bash(mv lib/checks/types.ts server/checks/types.ts)",
+      "Bash(mv lib/checks/utils.ts server/checks/utils.ts)",
+      "Bash(mv lib/checks/a-machine-access.ts server/checks/machine-access.ts)",
+      "Bash(mv lib/checks/b-content.ts server/checks/content.ts)",
+      "Bash(mv lib/checks/c-structure.ts server/checks/structure.ts)"
+    ]
+  }
+}

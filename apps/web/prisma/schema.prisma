@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Submission {
+  id        String   @id @default(uuid())
+  email     String
+  website   String
+  status    String   @default("pending")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  checks    Check[]
+
+  @@map("submissions")
+}
+
+model Check {
+  id           String     @id @default(uuid())
+  submissionId String     @map("submission_id")
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  name         String
+  description  String
+  passed       Boolean    @default(false)
+  details      String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([submissionId])
+  @@map("checks")
+}
