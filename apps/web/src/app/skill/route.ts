@@ -2,14 +2,12 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   return NextResponse.json({
-    name: "AgentReady",
-    description:
-      "Checks if a website is discoverable by AI agents like ChatGPT, Grok, Perplexity, Gemini, Claude, and Copilot.",
+    name: "OkforAI",
+    description: "Checks if a website is discoverable by AI agents like ChatGPT, Grok, Perplexity, Gemini, Claude, and Copilot.",
     capabilities: [
       {
         name: "website-check",
-        description:
-          "Scan a website for AI agent discoverability signals (skill.md, /skill endpoint, agent.json)",
+        description: "Scan a website for AI agent discoverability signals (skill.md, /skill endpoint, agent.json)",
         endpoint: "/api/check",
         method: "POST",
         parameters: {

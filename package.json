@@ -1,5 +1,5 @@
 {
-  "name": "agentready",
+  "name": "okforai",
   "private": true,
   "workspaces": [
     "apps/*"

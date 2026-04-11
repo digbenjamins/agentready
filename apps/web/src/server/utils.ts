@@ -1,4 +1,6 @@
-import type { SiteData } from "./types";
+import type { SiteData } from "./checks/types";
+
+// ── Fetching ─────────────────────────────────────────────
 
 export function normalizeUrl(website: string): string {
   let url = website.trim();
@@ -11,9 +13,7 @@ export function normalizeUrl(website: string): string {
   return url;
 }
 
-export async function fetchUrl(
-  url: string
-): Promise<{ ok: boolean; status: number; text: string; headers: Record<string, string>; responseTime: number }> {
+export async function fetchUrl(url: string): Promise<{ ok: boolean; status: number; text: string; headers: Record<string, string>; responseTime: number }> {
   const start = Date.now();
   try {
     const res = await fetch(url, {
@@ -21,7 +21,7 @@ export async function fetchUrl(
       signal: AbortSignal.timeout(15000),
       redirect: "follow",
       headers: {
-        "User-Agent": "AgentReady/1.0 (AI Readiness Checker)",
+        "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
       },
     });
     const text = await res.text();
@@ -35,9 +35,7 @@ export async function fetchUrl(
   }
 }
 
-export async function fetchHead(
-  url: string
-): Promise<{ ok: boolean; status: number; headers: Record<string, string>; responseTime: number }> {
+export async function fetchHead(url: string): Promise<{ ok: boolean; status: number; headers: Record<string, string>; responseTime: number }> {
   const start = Date.now();
   try {
     const res = await fetch(url, {
@@ -45,7 +43,7 @@ export async function fetchHead(
       signal: AbortSignal.timeout(10000),
       redirect: "follow",
       headers: {
-        "User-Agent": "AgentReady/1.0 (AI Readiness Checker)",
+        "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
       },
     });
     const headers: Record<string, string> = {};
@@ -82,6 +80,8 @@ export async function gatherSiteData(baseUrl: string): Promise<SiteData> {
   };
 }
 
+// ── HTML parsing ─────────────────────────────────────────
+
 export function countWords(text: string): number {
   return text
     .replace(/<[^>]*>/g, " ")
@@ -112,7 +112,7 @@ export function extractMetaTag(html: string, name: string): string | null {
   // Match name="..." or property="..."
   const regex = new RegExp(
     `<meta\\s+(?:[^>]*?(?:name|property)\\s*=\\s*["']${name}["'][^>]*?content\\s*=\\s*["']([^"']*)["']|[^>]*?content\\s*=\\s*["']([^"']*)["'][^>]*?(?:name|property)\\s*=\\s*["']${name}["'])`,
-    "i"
+    "i",
   );
   const match = html.match(regex);
   if (match) return match[1] || match[2] || null;

@@ -1,24 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import {
-  motion,
-  AnimatePresence,
-  useMotionValue,
-  useTransform,
-  useSpring,
-} from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { categoryOrder, getChecksByCategory } from "@/content/checks";
 
 interface CheckResult {
   name: string;
@@ -69,127 +58,109 @@ const terminalConvos: Conversation[] = [
     vendor: "ChatGPT",
     question: "What's the best CRM for small teams?",
     url: "pipedrive.com",
-    snippet:
-      "I'd recommend Pipedrive — it's built for small sales teams with a clean pipeline view.",
+    snippet: "I'd recommend Pipedrive — it's built for small sales teams with a clean pipeline view.",
   },
   {
     vendor: "Perplexity",
     question: "Top project management tools for startups",
     url: "linear.app",
-    snippet:
-      "Linear is widely recommended for fast-moving startup teams. Keyboard-first design.",
+    snippet: "Linear is widely recommended for fast-moving startup teams. Keyboard-first design.",
   },
   {
     vendor: "Claude",
     question: "Best website builder for restaurants?",
     url: "squarespace.com",
-    snippet:
-      "Squarespace stands out with beautiful templates and built-in reservation features.",
+    snippet: "Squarespace stands out with beautiful templates and built-in reservation features.",
   },
   {
     vendor: "Gemini",
     question: "Email platform for newsletters?",
     url: "beehiiv.com",
-    snippet:
-      "Beehiiv has become the go-to for newsletter creators. Built-in monetization tools.",
+    snippet: "Beehiiv has become the go-to for newsletter creators. Built-in monetization tools.",
   },
   {
     vendor: "Grok",
     question: "Recommend a landing page builder",
     url: "framer.com",
-    snippet:
-      "Framer is excellent — design-forward with great performance out of the box.",
+    snippet: "Framer is excellent — design-forward with great performance out of the box.",
   },
   {
     vendor: "Copilot",
     question: "Best analytics besides Google Analytics?",
     url: "plausible.io",
-    snippet:
-      "Plausible is privacy-friendly and gives you the essentials without the bloat.",
+    snippet: "Plausible is privacy-friendly and gives you the essentials without the bloat.",
   },
   {
     vendor: "ChatGPT",
     question: "Good scheduling tool for freelancers?",
     url: "cal.com",
-    snippet:
-      "Cal.com is open source and flexible. Handles timezone detection and multiple calendars.",
+    snippet: "Cal.com is open source and flexible. Handles timezone detection and multiple calendars.",
   },
   {
     vendor: "Perplexity",
     question: "What's the best invoicing software?",
     url: "invoice-ninja.com",
-    snippet:
-      "Invoice Ninja is powerful — open source, supports recurring invoices and auto-reminders.",
+    snippet: "Invoice Ninja is powerful — open source, supports recurring invoices and auto-reminders.",
   },
   {
     vendor: "Gemini",
     question: "Good customer support platform for SaaS?",
     url: "intercom.com",
-    snippet:
-      "Intercom is a top choice for SaaS. It combines live chat, bots, and a help center.",
+    snippet: "Intercom is a top choice for SaaS. It combines live chat, bots, and a help center.",
   },
   {
     vendor: "Claude",
     question: "Best tool for automated social media posting?",
     url: "buffer.com",
-    snippet:
-      "Buffer keeps things simple — schedule posts across platforms with a clean UI.",
+    snippet: "Buffer keeps things simple — schedule posts across platforms with a clean UI.",
   },
   {
     vendor: "Grok",
     question: "Best no-code database tool?",
     url: "airtable.com",
-    snippet:
-      "Airtable bridges spreadsheets and databases beautifully. Great for non-technical teams.",
+    snippet: "Airtable bridges spreadsheets and databases beautifully. Great for non-technical teams.",
   },
   {
     vendor: "Copilot",
     question: "Recommend a monitoring tool for web apps",
     url: "sentry.io",
-    snippet:
-      "Sentry is the standard for error tracking and performance monitoring across stacks.",
+    snippet: "Sentry is the standard for error tracking and performance monitoring across stacks.",
   },
   {
     vendor: "ChatGPT",
     question: "Best tool for user onboarding?",
     url: "userpilot.com",
-    snippet:
-      "Userpilot lets you build in-app onboarding flows without code. Great for SaaS.",
+    snippet: "Userpilot lets you build in-app onboarding flows without code. Great for SaaS.",
   },
   {
     vendor: "Perplexity",
     question: "Top headless CMS for developers?",
     url: "sanity.io",
-    snippet:
-      "Sanity offers a flexible, real-time content platform that developers love.",
+    snippet: "Sanity offers a flexible, real-time content platform that developers love.",
   },
   {
     vendor: "Gemini",
     question: "What's a good alternative to Jira?",
     url: "shortcut.com",
-    snippet:
-      "Shortcut strikes a nice balance between power and usability for engineering teams.",
+    snippet: "Shortcut strikes a nice balance between power and usability for engineering teams.",
   },
   {
     vendor: "Grok",
     question: "Best platform for creating online courses?",
     url: "teachable.com",
-    snippet:
-      "Teachable makes it easy to package and sell courses. Handles payments and hosting.",
+    snippet: "Teachable makes it easy to package and sell courses. Handles payments and hosting.",
   },
   {
     vendor: "Claude",
     question: "What's the best design collaboration tool?",
     url: "figma.com",
-    snippet:
-      "Figma remains the industry standard for design collaboration with real-time editing.",
+    snippet: "Figma remains the industry standard for design collaboration with real-time editing.",
   },
   {
     vendor: "Copilot",
     question: "Recommend a team communication tool",
     url: "slack.com",
-    snippet:
-      "Slack remains dominant for team messaging with its channel system and integrations.",
+    snippet: "Slack remains dominant for team messaging with its channel system and integrations.",
   },
 ];
 
@@ -242,20 +213,9 @@ function useResponseTyping(text: string, speed: number, enabled: boolean): strin
 }
 
 // Phases: type in input → click send → bubble appears → AI types response → show url → hold → fade → next
-type TerminalPhase =
-  | "typing-input"
-  | "send-click"
-  | "show-bubble"
-  | "typing-response"
-  | "show-url"
-  | "hold"
-  | "fade";
+type TerminalPhase = "typing-input" | "send-click" | "show-bubble" | "typing-response" | "show-url" | "hold" | "fade";
 
-function TypingTerminal({
-  convos,
-}: {
-  convos: Conversation[];
-}) {
+function TypingTerminal({ convos }: { convos: Conversation[] }) {
   const delay = 600;
   const [index, setIndex] = useState(0);
   const [phase, setPhase] = useState<TerminalPhase>("typing-input");
@@ -271,16 +231,8 @@ function TypingTerminal({
     return () => clearTimeout(t);
   }, [delay]);
 
-  const typedInput = useInputTyping(
-    convo.question,
-    38,
-    started && phase === "typing-input"
-  );
-  const typedResponse = useResponseTyping(
-    convo.snippet,
-    16,
-    phase === "typing-response"
-  );
+  const typedInput = useInputTyping(convo.question, 38, started && phase === "typing-input");
+  const typedResponse = useResponseTyping(convo.snippet, 16, phase === "typing-response");
 
   // Phase machine
   useEffect(() => {
@@ -289,10 +241,7 @@ function TypingTerminal({
     let timer: ReturnType<typeof setTimeout>;
 
     if (phase === "typing-input") {
-      timer = setTimeout(
-        () => setPhase("send-click"),
-        convo.question.length * 38 + 300
-      );
+      timer = setTimeout(() => setPhase("send-click"), convo.question.length * 38 + 300);
     } else if (phase === "send-click") {
       setSendPressed(true);
       timer = setTimeout(() => {
@@ -302,10 +251,7 @@ function TypingTerminal({
     } else if (phase === "show-bubble") {
       timer = setTimeout(() => setPhase("typing-response"), 400);
     } else if (phase === "typing-response") {
-      timer = setTimeout(
-        () => setPhase("show-url"),
-        convo.snippet.length * 16 + 200
-      );
+      timer = setTimeout(() => setPhase("show-url"), convo.snippet.length * 16 + 200);
     } else if (phase === "show-url") {
       timer = setTimeout(() => setPhase("hold"), 800);
     } else if (phase === "hold") {
@@ -320,15 +266,8 @@ function TypingTerminal({
     return () => clearTimeout(timer);
   }, [phase, started, convo, convos.length]);
 
-  const showBubble =
-    phase === "show-bubble" ||
-    phase === "typing-response" ||
-    phase === "show-url" ||
-    phase === "hold";
-  const showResponse =
-    phase === "typing-response" ||
-    phase === "show-url" ||
-    phase === "hold";
+  const showBubble = phase === "show-bubble" || phase === "typing-response" || phase === "show-url" || phase === "hold";
+  const showResponse = phase === "typing-response" || phase === "show-url" || phase === "hold";
   const showUrl = phase === "show-url" || phase === "hold";
 
   return (
@@ -380,29 +319,18 @@ function TypingTerminal({
                 className="flex justify-end"
               >
                 <div className="bg-primary/10 border border-primary/20 rounded-xl rounded-br-sm px-3 py-1.5 max-w-[88%]">
-                  <p className="text-[13px] text-foreground/90">
-                    {convo.question}
-                  </p>
+                  <p className="text-[13px] text-foreground/90">{convo.question}</p>
                 </div>
               </motion.div>
             )}
 
             {/* AI response */}
             {showResponse && (
-              <motion.div
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="flex justify-start"
-              >
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="flex justify-start">
                 <div className="bg-secondary/50 rounded-xl rounded-bl-sm px-3 py-1.5 max-w-[92%]">
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    {phase === "typing-response"
-                      ? typedResponse
-                      : convo.snippet}
-                    {phase === "typing-response" && (
-                      <span className="inline-block w-[2px] h-3 bg-muted-foreground/60 ml-0.5 align-middle animate-pulse" />
-                    )}
+                    {phase === "typing-response" ? typedResponse : convo.snippet}
+                    {phase === "typing-response" && <span className="inline-block w-[2px] h-3 bg-muted-foreground/60 ml-0.5 align-middle animate-pulse" />}
                   </p>
                   {showUrl && (
                     <span className="relative inline-flex items-center gap-2 mt-1.5">
@@ -431,10 +359,7 @@ function TypingTerminal({
                         className="text-[10px] text-primary font-medium whitespace-nowrap flex items-center gap-0.5"
                       >
                         <span>←</span>
-                        <motion.span
-                          animate={{ opacity: [0.5, 1, 0.5] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                        >
+                        <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
                           this could be you
                         </motion.span>
                       </motion.span>
@@ -455,24 +380,13 @@ function TypingTerminal({
                     <span className="inline-block w-[2px] h-3.5 bg-foreground/50 ml-0.5 align-middle animate-pulse" />
                   </>
                 )}
-                {phase === "send-click" && (
-                  <span className="text-foreground/50">{convo.question}</span>
-                )}
-                {!["typing-input", "send-click"].includes(phase) && (
-                  <span className="text-muted-foreground/30">
-                    Ask anything...
-                  </span>
-                )}
+                {phase === "send-click" && <span className="text-foreground/50">{convo.question}</span>}
+                {!["typing-input", "send-click"].includes(phase) && <span className="text-muted-foreground/30">Ask anything...</span>}
               </p>
               <motion.div
                 animate={{
                   scale: sendPressed ? 0.85 : 1,
-                  backgroundColor: sendPressed
-                    ? vendor.color
-                    : phase === "typing-input" &&
-                      typedInput.length > 0
-                    ? `${vendor.color}cc`
-                    : `${vendor.color}33`,
+                  backgroundColor: sendPressed ? vendor.color : phase === "typing-input" && typedInput.length > 0 ? `${vendor.color}cc` : `${vendor.color}33`,
                 }}
                 transition={{ duration: 0.1 }}
                 className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
@@ -606,14 +520,12 @@ export default function Home() {
           reportRef.current?.scrollIntoView({ behavior: "smooth" });
         }, 100);
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Something went wrong"
-        );
+        setError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
         setLoading(false);
       }
     },
-    [email, website]
+    [email, website],
   );
 
   return (
@@ -626,8 +538,7 @@ export default function Home() {
       <div
         className="fixed inset-0 pointer-events-none opacity-[0.03]"
         style={{
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)",
           backgroundSize: "64px 64px",
         }}
       />
@@ -641,15 +552,13 @@ export default function Home() {
       >
         <div className="mx-auto max-w-6xl flex items-center justify-between h-14">
           <a href="/" className="flex items-center gap-1.5 group">
-            <span className="text-lg font-bold tracking-tight text-foreground">
-              Agent
-            </span>
+            <span className="text-lg font-bold tracking-tight text-foreground">OKFOR</span>
             <motion.span
               className="bg-primary text-white text-sm font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1"
               whileHover={{ scale: 1.05 }}
               transition={{ type: "spring", stiffness: 400, damping: 20 }}
             >
-              Ready
+              AI
               <motion.svg
                 width="14"
                 height="14"
@@ -669,10 +578,7 @@ export default function Home() {
               </motion.svg>
             </motion.span>
           </a>
-          <a
-            href="#why"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block"
-          >
+          <a href="#why" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">
             Why it matters
           </a>
         </div>
@@ -698,21 +604,11 @@ export default function Home() {
               animate="visible"
               variants={staggerContainer}
             >
-              <motion.span
-                className="block"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0 }}
-              >
+              <motion.span className="block" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0 }}>
                 People stopped
               </motion.span>
               <CyclingWord words={["googling.", "searching.", "browsing."]} />
-              <motion.span
-                className="block"
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.24 }}
-              >
+              <motion.span className="block" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.24 }}>
                 They started <span className="text-primary">asking.</span>
               </motion.span>
             </motion.h1>
@@ -723,10 +619,8 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.5 }}
               className="text-lg text-muted-foreground leading-relaxed"
             >
-              Your customers already use ChatGPT, Grok, and Perplexity to
-              find tools and services. When they ask &quot;what&apos;s the
-              best tool for X&quot;, the AI only pulls from sites it can
-              actually read.
+              Your customers already use ChatGPT, Grok, and Perplexity to find tools and services. When they ask &quot;what&apos;s the best tool for X&quot;,
+              the AI only pulls from sites it can actually read.
             </motion.p>
           </div>
 
@@ -747,8 +641,7 @@ export default function Home() {
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            If your site isn&apos;t set up for AI agents, you won&apos;t show
-            up.
+            If your site isn&apos;t set up for AI agents, you won&apos;t show up.
           </motion.p>
           <motion.p
             className="text-sm font-mono text-muted-foreground uppercase tracking-widest mb-6"
@@ -836,12 +729,9 @@ export default function Home() {
             <div className="absolute -inset-px rounded-xl bg-gradient-to-b from-primary/20 via-transparent to-transparent blur-sm pointer-events-none" />
             <Card className="border-border/50 bg-card relative">
               <CardHeader className="pb-4">
-                <CardTitle className="text-xl">
-                  How visible is your site to AI?
-                </CardTitle>
+                <CardTitle className="text-xl">How visible is your site to AI?</CardTitle>
                 <CardDescription className="text-base">
-                  Drop your URL below. We check the three things AI agents
-                  look for and send you a report.
+                  Drop your URL below. We check the three things AI agents look for and send you a report.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -871,23 +761,12 @@ export default function Home() {
                     />
                   </div>
                   {error && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-sm text-destructive"
-                    >
+                    <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-destructive">
                       {error}
                     </motion.p>
                   )}
-                  <motion.div
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.985 }}
-                  >
-                    <Button
-                      type="submit"
-                      className="w-full h-12 text-base font-semibold relative overflow-hidden"
-                      disabled={loading}
-                    >
+                  <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.985 }}>
+                    <Button type="submit" className="w-full h-12 text-base font-semibold relative overflow-hidden" disabled={loading}>
                       {loading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -901,9 +780,7 @@ export default function Home() {
                       )}
                     </Button>
                   </motion.div>
-                  <p className="text-xs text-muted-foreground text-center pt-1">
-                    Takes about 30 seconds. No account needed.
-                  </p>
+                  <p className="text-xs text-muted-foreground text-center pt-1">Takes about 30 seconds. No account needed.</p>
                 </form>
               </CardContent>
             </Card>
@@ -925,13 +802,7 @@ export default function Home() {
             <div className="mx-auto max-w-2xl space-y-6">
               <Card className="border-border/50 bg-card overflow-hidden">
                 <motion.div
-                  className={`h-1.5 origin-left ${
-                    report.score >= 66
-                      ? "bg-green-500"
-                      : report.score >= 33
-                      ? "bg-yellow-500"
-                      : "bg-red-500"
-                  }`}
+                  className={`h-1.5 origin-left ${report.score >= 66 ? "bg-green-500" : report.score >= 33 ? "bg-yellow-500" : "bg-red-500"}`}
                   initial={{ scaleX: 0 }}
                   animate={{ scaleX: 1 }}
                   transition={{ duration: 0.6, delay: 0.2 }}
@@ -941,30 +812,18 @@ export default function Home() {
                     <span>Your Score</span>
                     <span
                       className={`text-4xl font-bold tabular-nums ${
-                        report.score >= 66
-                          ? "text-green-400"
-                          : report.score >= 33
-                          ? "text-yellow-400"
-                          : "text-red-400"
+                        report.score >= 66 ? "text-green-400" : report.score >= 33 ? "text-yellow-400" : "text-red-400"
                       }`}
                     >
                       <AnimatedScore score={report.score} />
                     </span>
                   </CardTitle>
-                  <CardDescription className="text-base">
-                    {report.website}
-                  </CardDescription>
+                  <CardDescription className="text-base">{report.website}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="w-full bg-secondary rounded-full h-2 mb-8">
                     <motion.div
-                      className={`h-2 rounded-full ${
-                        report.score >= 66
-                          ? "bg-green-500"
-                          : report.score >= 33
-                          ? "bg-yellow-500"
-                          : "bg-red-500"
-                      }`}
+                      className={`h-2 rounded-full ${report.score >= 66 ? "bg-green-500" : report.score >= 33 ? "bg-yellow-500" : "bg-red-500"}`}
                       initial={{ width: 0 }}
                       animate={{ width: `${report.score}%` }}
                       transition={{
@@ -975,18 +834,9 @@ export default function Home() {
                     />
                   </div>
 
-                  <motion.div
-                    className="space-y-3"
-                    initial="hidden"
-                    animate="visible"
-                    variants={staggerContainer}
-                  >
+                  <motion.div className="space-y-3" initial="hidden" animate="visible" variants={staggerContainer}>
                     {report.checks.map((check, i) => (
-                      <motion.div
-                        key={i}
-                        variants={scaleIn}
-                        className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-secondary/30"
-                      >
+                      <motion.div key={i} variants={scaleIn} className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-secondary/30">
                         {check.passed ? (
                           <motion.div
                             initial={{ rotate: -90, opacity: 0 }}
@@ -1012,14 +862,8 @@ export default function Home() {
                         )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium">{check.name}</p>
-                          <p className="text-sm text-muted-foreground mt-0.5">
-                            {check.description}
-                          </p>
-                          {check.details && (
-                            <p className="text-sm mt-1.5 text-muted-foreground/80">
-                              {check.details}
-                            </p>
-                          )}
+                          <p className="text-sm text-muted-foreground mt-0.5">{check.description}</p>
+                          {check.details && <p className="text-sm mt-1.5 text-muted-foreground/80">{check.details}</p>}
                         </div>
                       </motion.div>
                     ))}
@@ -1032,10 +876,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Why it matters */}
-      <section
-        id="why"
-        className="py-20 px-6 border-t border-border/40 relative"
-      >
+      <section id="why" className="py-20 px-6 border-t border-border/40 relative">
         <div className="mx-auto max-w-3xl">
           <motion.h2
             className="text-3xl font-bold tracking-tight mb-10"
@@ -1051,7 +892,7 @@ export default function Home() {
             {[
               {
                 title: "AI answers are replacing search results",
-                body: 'Someone asks ChatGPT "best project management tool for startups" and it doesn\'t show ten blue links. It recommends one or two. If you\'re not one of them, you don\'t get the click.',
+                body: "Someone asks ChatGPT \"best project management tool for startups\" and it doesn't show ten blue links. It recommends one or two. If you're not one of them, you don't get the click.",
               },
               {
                 title: "Agents need structure, not just content",
@@ -1084,24 +925,15 @@ export default function Home() {
                   {i + 1}
                 </motion.span>
                 <div>
-                  <p className="text-foreground font-medium text-lg mb-1">
-                    {item.title}
-                  </p>
+                  <p className="text-foreground font-medium text-lg mb-1">{item.title}</p>
                   {item.body ? (
                     <p className="leading-relaxed">{item.body}</p>
                   ) : (
                     <p className="leading-relaxed">
-                      Good writing alone won&apos;t cut it. AI agents look for
-                      machine-readable files like{" "}
-                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">
-                        /skill.md
-                      </code>{" "}
-                      and{" "}
-                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">
-                        agent.json
-                      </code>{" "}
-                      to figure out what your site does and whether it&apos;s
-                      worth recommending.
+                      Good writing alone won&apos;t cut it. AI agents look for machine-readable files like{" "}
+                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">/skill.md</code> and{" "}
+                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">agent.json</code> to figure out what your site does and
+                      whether it&apos;s worth recommending.
                     </p>
                   )}
                 </div>
@@ -1119,76 +951,75 @@ export default function Home() {
         viewport={{ once: true }}
         transition={{ duration: 0.5 }}
       >
-        <div className="mx-auto max-w-5xl">
-          <div className="grid sm:grid-cols-3 gap-8">
-            <div>
+        <div className="mx-auto max-w-6xl">
+          <div className="flex flex-col lg:flex-row lg:items-start gap-10 lg:gap-16 mb-12">
+            <div className="lg:w-64 shrink-0">
               <span className="flex items-center gap-1.5 mb-3">
-                <span className="font-bold text-foreground">Agent</span>
-                <span className="bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-md">
-                  Ready ✓
-                </span>
+                <span className="font-bold text-foreground">OKFOR</span>
+                <span className="bg-primary text-white text-xs font-bold px-1.5 py-0.5 rounded-md">AI ✓</span>
               </span>
-              <p className="text-sm text-muted-foreground">
-                Make your website part of the AI conversation.
-              </p>
+              <p className="text-sm text-muted-foreground mb-6">Make your website part of the AI conversation.</p>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-widest font-mono mb-3">Resources</p>
+                <ul className="space-y-2 text-sm">
+                  <li>
+                    <a href="/checks" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Knowledge base
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#why" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Why it matters
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#audit" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Free audit
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-mono mb-3">
-                Checks
-              </p>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a
-                    href="/checks/skill-md"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    skill.md
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/checks/skill-endpoint"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    /skill endpoint
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="/checks/agent-json"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    .well-known/agent.json
-                  </a>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-widest font-mono mb-3">
-                Resources
-              </p>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a
-                    href="#why"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Why it matters
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="#audit"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    Free audit
-                  </a>
-                </li>
-              </ul>
+
+            <div className="flex-1">
+              <div className="flex items-baseline justify-between mb-5">
+                <p className="text-xs text-muted-foreground uppercase tracking-widest font-mono">Knowledge base</p>
+                <a href="/checks" className="text-xs text-primary hover:underline font-medium">
+                  View all →
+                </a>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-8">
+                {categoryOrder.map((category) => {
+                  const checks = getChecksByCategory(category.code);
+                  if (checks.length === 0) return null;
+                  return (
+                    <div key={category.code}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="font-mono text-[10px] text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                          {category.code}
+                        </span>
+                        <p className="text-xs font-semibold text-foreground">{category.name}</p>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {checks.map((check) => (
+                          <li key={check.slug}>
+                            <a
+                              href={`/checks/${check.slug}`}
+                              className="text-xs text-muted-foreground hover:text-foreground transition-colors leading-snug block"
+                            >
+                              {check.title}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
           <div className="mt-10 pt-6 border-t border-border/30 text-xs text-muted-foreground/60 text-center">
-            AgentReady — Helping websites get discovered by AI agents.
+            OkforAI — Helping websites get discovered by AI agents.
           </div>
         </div>
       </motion.footer>

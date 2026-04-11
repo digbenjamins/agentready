@@ -25,7 +25,9 @@
       "Bash(mv lib/checks/utils.ts server/checks/utils.ts)",
       "Bash(mv lib/checks/a-machine-access.ts server/checks/machine-access.ts)",
       "Bash(mv lib/checks/b-content.ts server/checks/content.ts)",
-      "Bash(mv lib/checks/c-structure.ts server/checks/structure.ts)"
+      "Bash(mv lib/checks/c-structure.ts server/checks/structure.ts)",
+      "Bash(ls d:/agentready/apps/web/.env*)",
+      "Bash(ls d:/agentready/.env*)"
     ]
   }
 }
