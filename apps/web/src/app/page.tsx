@@ -619,8 +619,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.5 }}
               className="text-lg text-muted-foreground leading-relaxed"
             >
-              Your customers already use ChatGPT, Grok, and Perplexity to find tools and services. When they ask &quot;what&apos;s the best tool for X&quot;,
-              the AI only pulls from sites it can actually read.
+              Get an AI visibility report in 30 seconds. See whether ChatGPT and other AI tools can read, understand and recommend your website.
             </motion.p>
           </div>
 
