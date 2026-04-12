@@ -365,12 +365,12 @@ export function ResultsView({ submission }: { submission: Submission }) {
               </div>
               <div className="text-right shrink-0 ml-6">
                 <p className="text-sm text-muted-foreground/60 line-through tabular-nums">
-                  &euro;27
+                  &euro;29
                 </p>
                 <p className="text-3xl font-bold text-foreground tabular-nums">
                   &euro;19
                 </p>
-                <p className="text-[10px] text-primary font-medium">launch price</p>
+                <p className="text-[10px] text-primary font-medium">temporary offer</p>
               </div>
             </div>
 
@@ -399,12 +399,12 @@ export function ResultsView({ submission }: { submission: Submission }) {
             <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 px-4 py-2.5 mb-4 flex items-center justify-center gap-2">
               <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               <p className="text-xs text-amber-500">
-                <span className="font-medium">Easter launch offer.</span>{" "}Get &euro;8 off your full audit, for a limited time only.
+                <span className="font-medium">Easter launch offer.</span>{" "}Get &euro;10 off your full audit, for a limited time only.
               </p>
             </div>
 
             <Button className="w-full h-11 gap-2 text-sm font-medium">
-              Unlock full audit — &euro;19
+              Unlock full audit — <span className="line-through opacity-60">&euro;29</span> &euro;19
               <ArrowRight className="h-4 w-4" />
             </Button>
             <p className="text-[10px] text-muted-foreground text-center mt-3 tracking-wide">
