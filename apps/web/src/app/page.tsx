@@ -1,40 +1,17 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from "framer-motion";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { ArrowRight, CheckCircle2, XCircle, Loader2, Bot, Globe, AlertCircle } from "lucide-react";
 import { categoryOrder, getChecksByCategory } from "@/content/checks";
-
-interface CheckResult {
-  name: string;
-  description: string;
-  passed: boolean;
-  details: string | null;
-}
-
-interface Report {
-  id: string;
-  website: string;
-  score: number;
-  checks: CheckResult[];
-}
 
 const staggerContainer = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.1 } },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.9 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.4, ease: [0.25, 0.4, 0.25, 1] as const },
-  },
 };
 
 const vendors = [
@@ -46,384 +23,405 @@ const vendors = [
   { name: "Copilot", color: "#0078d4" },
 ];
 
-interface Conversation {
-  vendor: string;
-  question: string;
-  url: string;
-  snippet: string;
-}
+function HowItWorksAnimation() {
+  const [stage, setStage] = useState(0);
+  const [typedUrl, setTypedUrl] = useState("");
+  const [autoCheckedCount, setAutoCheckedCount] = useState(0);
+  const [llmCheckedCount, setLlmCheckedCount] = useState(0);
+  const [visibilityScore, setVisibilityScore] = useState(0);
+  const [discoverabilityScore, setDiscoverabilityScore] = useState(0);
 
-const terminalConvos: Conversation[] = [
-  {
-    vendor: "ChatGPT",
-    question: "What's the best CRM for small teams?",
-    url: "pipedrive.com",
-    snippet: "I'd recommend Pipedrive — it's built for small sales teams with a clean pipeline view.",
-  },
-  {
-    vendor: "Perplexity",
-    question: "Top project management tools for startups",
-    url: "linear.app",
-    snippet: "Linear is widely recommended for fast-moving startup teams. Keyboard-first design.",
-  },
-  {
-    vendor: "Claude",
-    question: "Best website builder for restaurants?",
-    url: "squarespace.com",
-    snippet: "Squarespace stands out with beautiful templates and built-in reservation features.",
-  },
-  {
-    vendor: "Gemini",
-    question: "Email platform for newsletters?",
-    url: "beehiiv.com",
-    snippet: "Beehiiv has become the go-to for newsletter creators. Built-in monetization tools.",
-  },
-  {
-    vendor: "Grok",
-    question: "Recommend a landing page builder",
-    url: "framer.com",
-    snippet: "Framer is excellent — design-forward with great performance out of the box.",
-  },
-  {
-    vendor: "Copilot",
-    question: "Best analytics besides Google Analytics?",
-    url: "plausible.io",
-    snippet: "Plausible is privacy-friendly and gives you the essentials without the bloat.",
-  },
-  {
-    vendor: "ChatGPT",
-    question: "Good scheduling tool for freelancers?",
-    url: "cal.com",
-    snippet: "Cal.com is open source and flexible. Handles timezone detection and multiple calendars.",
-  },
-  {
-    vendor: "Perplexity",
-    question: "What's the best invoicing software?",
-    url: "invoice-ninja.com",
-    snippet: "Invoice Ninja is powerful — open source, supports recurring invoices and auto-reminders.",
-  },
-  {
-    vendor: "Gemini",
-    question: "Good customer support platform for SaaS?",
-    url: "intercom.com",
-    snippet: "Intercom is a top choice for SaaS. It combines live chat, bots, and a help center.",
-  },
-  {
-    vendor: "Claude",
-    question: "Best tool for automated social media posting?",
-    url: "buffer.com",
-    snippet: "Buffer keeps things simple — schedule posts across platforms with a clean UI.",
-  },
-  {
-    vendor: "Grok",
-    question: "Best no-code database tool?",
-    url: "airtable.com",
-    snippet: "Airtable bridges spreadsheets and databases beautifully. Great for non-technical teams.",
-  },
-  {
-    vendor: "Copilot",
-    question: "Recommend a monitoring tool for web apps",
-    url: "sentry.io",
-    snippet: "Sentry is the standard for error tracking and performance monitoring across stacks.",
-  },
-  {
-    vendor: "ChatGPT",
-    question: "Best tool for user onboarding?",
-    url: "userpilot.com",
-    snippet: "Userpilot lets you build in-app onboarding flows without code. Great for SaaS.",
-  },
-  {
-    vendor: "Perplexity",
-    question: "Top headless CMS for developers?",
-    url: "sanity.io",
-    snippet: "Sanity offers a flexible, real-time content platform that developers love.",
-  },
-  {
-    vendor: "Gemini",
-    question: "What's a good alternative to Jira?",
-    url: "shortcut.com",
-    snippet: "Shortcut strikes a nice balance between power and usability for engineering teams.",
-  },
-  {
-    vendor: "Grok",
-    question: "Best platform for creating online courses?",
-    url: "teachable.com",
-    snippet: "Teachable makes it easy to package and sell courses. Handles payments and hosting.",
-  },
-  {
-    vendor: "Claude",
-    question: "What's the best design collaboration tool?",
-    url: "figma.com",
-    snippet: "Figma remains the industry standard for design collaboration with real-time editing.",
-  },
-  {
-    vendor: "Copilot",
-    question: "Recommend a team communication tool",
-    url: "slack.com",
-    snippet: "Slack remains dominant for team messaging with its channel system and integrations.",
-  },
-];
+  const url = "yourwebsite.com";
 
-function getVendor(name: string) {
-  return vendors.find((v) => v.name === name) ?? vendors[0];
-}
+  const autoChecks = [
+    "Crawl permissions",
+    "Site structure",
+    "Schema markup",
+    "Trust signals",
+    "Page performance",
+  ];
 
-// Typing into an input field hook
-function useInputTyping(text: string, speed: number, enabled: boolean): string {
-  const [displayed, setDisplayed] = useState("");
+  const llmChecks = [
+    "Content clarity",
+    "Conversational fit",
+    "Entity recognition",
+    "Authority signals",
+    "Citation readiness",
+  ];
 
   useEffect(() => {
-    if (!enabled) {
-      setDisplayed("");
-      return;
-    }
-    setDisplayed("");
-    let i = 0;
-    const interval = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) clearInterval(interval);
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed, enabled]);
-
-  return displayed;
-}
-
-// Typing for the AI response
-function useResponseTyping(text: string, speed: number, enabled: boolean): string {
-  const [displayed, setDisplayed] = useState("");
-
-  useEffect(() => {
-    if (!enabled) {
-      setDisplayed("");
-      return;
-    }
-    setDisplayed("");
-    let i = 0;
-    const interval = setInterval(() => {
-      i++;
-      setDisplayed(text.slice(0, i));
-      if (i >= text.length) clearInterval(interval);
-    }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed, enabled]);
-
-  return displayed;
-}
-
-// Phases: type in input → click send → bubble appears → AI types response → show url → hold → fade → next
-type TerminalPhase = "typing-input" | "send-click" | "show-bubble" | "typing-response" | "show-url" | "hold" | "fade";
-
-function TypingTerminal({ convos }: { convos: Conversation[] }) {
-  const delay = 600;
-  const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<TerminalPhase>("typing-input");
-  const [started, setStarted] = useState(false);
-  const [sendPressed, setSendPressed] = useState(false);
-
-  const convo = convos[index];
-  const vendor = getVendor(convo.vendor);
-
-  // Initial stagger delay
-  useEffect(() => {
-    const t = setTimeout(() => setStarted(true), delay);
-    return () => clearTimeout(t);
-  }, [delay]);
-
-  const typedInput = useInputTyping(convo.question, 38, started && phase === "typing-input");
-  const typedResponse = useResponseTyping(convo.snippet, 16, phase === "typing-response");
-
-  // Phase machine
-  useEffect(() => {
-    if (!started) return;
-
-    let timer: ReturnType<typeof setTimeout>;
-
-    if (phase === "typing-input") {
-      timer = setTimeout(() => setPhase("send-click"), convo.question.length * 38 + 300);
-    } else if (phase === "send-click") {
-      setSendPressed(true);
-      timer = setTimeout(() => {
-        setSendPressed(false);
-        setPhase("show-bubble");
-      }, 250);
-    } else if (phase === "show-bubble") {
-      timer = setTimeout(() => setPhase("typing-response"), 400);
-    } else if (phase === "typing-response") {
-      timer = setTimeout(() => setPhase("show-url"), convo.snippet.length * 16 + 200);
-    } else if (phase === "show-url") {
-      timer = setTimeout(() => setPhase("hold"), 800);
-    } else if (phase === "hold") {
-      timer = setTimeout(() => setPhase("fade"), 2200);
-    } else if (phase === "fade") {
-      timer = setTimeout(() => {
-        setIndex((prev) => (prev + 1) % convos.length);
-        setPhase("typing-input");
-      }, 500);
-    }
-
+    const stageDurations = [3500, 5500, 6500];
+    const timer = setTimeout(() => {
+      setStage((s) => (s + 1) % 3);
+    }, stageDurations[stage]);
     return () => clearTimeout(timer);
-  }, [phase, started, convo, convos.length]);
+  }, [stage]);
 
-  const showBubble = phase === "show-bubble" || phase === "typing-response" || phase === "show-url" || phase === "hold";
-  const showResponse = phase === "typing-response" || phase === "show-url" || phase === "hold";
-  const showUrl = phase === "show-url" || phase === "hold";
+  useEffect(() => {
+    if (stage !== 0) {
+      setTypedUrl("");
+      return;
+    }
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setTypedUrl(url.slice(0, i));
+      if (i >= url.length) clearInterval(interval);
+    }, 110);
+    return () => clearInterval(interval);
+  }, [stage]);
+
+  // Automated checks
+  useEffect(() => {
+    if (stage !== 1) {
+      setAutoCheckedCount(0);
+      return;
+    }
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setAutoCheckedCount(i);
+      if (i >= autoChecks.length) clearInterval(interval);
+    }, 500);
+    return () => clearInterval(interval);
+  }, [stage]);
+
+  // LLM checks run in parallel, slightly slower pace
+  useEffect(() => {
+    if (stage !== 1) {
+      setLlmCheckedCount(0);
+      return;
+    }
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setLlmCheckedCount(i);
+      if (i >= llmChecks.length) clearInterval(interval);
+    }, 750);
+    return () => clearInterval(interval);
+  }, [stage]);
+
+  useEffect(() => {
+    if (stage !== 2) {
+      setVisibilityScore(0);
+      setDiscoverabilityScore(0);
+      return;
+    }
+    const duration = 1400;
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setVisibilityScore(Math.round(47 * eased));
+      setDiscoverabilityScore(Math.round(31 * eased));
+      if (t >= 1) clearInterval(interval);
+    }, 30);
+    return () => clearInterval(interval);
+  }, [stage]);
+
+  const steps = [
+    { num: "1", label: "Paste your URL" },
+    { num: "2", label: "We audit your site" },
+    { num: "3", label: "You get your scores" },
+  ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: delay / 1000 }}
-      className="rounded-lg border border-border/40 bg-card/90 backdrop-blur-sm overflow-hidden flex flex-col h-[320px]"
-    >
-      {/* Title bar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-secondary/30">
-        <span className="flex gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
-          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
-          <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
-        </span>
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={`${index}-${convo.vendor}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="text-xs font-medium ml-1"
-            style={{ color: vendor.color }}
-          >
-            {vendor.name}
-          </motion.span>
-        </AnimatePresence>
+    <div className="relative rounded-2xl border border-border/60 bg-secondary/20 p-6 md:p-10 overflow-hidden">
+      <div className="flex items-center justify-center gap-2 md:gap-3 mb-6">
+        {steps.map((s, i) => (
+          <div key={s.num} className="flex items-center gap-2 md:gap-3">
+            <div className="flex items-center gap-2.5">
+              <motion.div
+                className="flex items-center justify-center h-8 w-8 rounded-full font-semibold text-sm tabular-nums"
+                animate={{
+                  backgroundColor:
+                    stage === i
+                      ? "color-mix(in oklch, var(--color-primary) 100%, transparent)"
+                      : stage > i
+                        ? "color-mix(in oklch, var(--color-primary) 20%, transparent)"
+                        : "color-mix(in oklch, var(--color-secondary) 60%, transparent)",
+                  color:
+                    stage === i
+                      ? "var(--color-primary-foreground)"
+                      : stage > i
+                        ? "var(--color-primary)"
+                        : "var(--color-muted-foreground)",
+                }}
+                transition={{ duration: 0.3 }}
+              >
+                {stage > i ? <CheckCircle2 className="h-4 w-4" /> : s.num}
+              </motion.div>
+              <span
+                className={`hidden md:inline text-sm font-medium transition-colors ${
+                  stage === i ? "text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className="w-8 md:w-10 h-px bg-border/60" />
+            )}
+          </div>
+        ))}
       </div>
 
-      {/* Chat area */}
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={index}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: phase === "fade" ? 0 : 1 }}
-          transition={{ duration: 0.3 }}
-          className="flex-1 flex flex-col min-h-0"
-        >
-          {/* Messages */}
-          <div className="flex-1 p-3 space-y-2 overflow-hidden">
-            {/* User bubble — appears after send */}
-            {showBubble && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9, y: 6 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                className="flex justify-end"
-              >
-                <div className="bg-primary/10 border border-primary/20 rounded-xl rounded-br-sm px-3 py-1.5 max-w-[88%]">
-                  <p className="text-[13px] text-foreground/90">{convo.question}</p>
+      <div className="min-h-[260px] flex items-start justify-center">
+        <AnimatePresence mode="wait">
+          {stage === 0 && (
+            <motion.div
+              key="stage-0"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35 }}
+              className="w-full max-w-lg self-center"
+            >
+              <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex-1 h-12 rounded-md border border-border/80 bg-background/60 flex items-center px-4 text-base font-mono text-foreground">
+                  {typedUrl}
+                  <motion.span
+                    className="inline-block w-[2px] h-5 bg-primary ml-0.5"
+                    animate={{ opacity: [1, 0, 1] }}
+                    transition={{ duration: 0.9, repeat: Infinity }}
+                  />
                 </div>
-              </motion.div>
-            )}
-
-            {/* AI response */}
-            {showResponse && (
-              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }} className="flex justify-start">
-                <div className="bg-secondary/50 rounded-xl rounded-bl-sm px-3 py-1.5 max-w-[92%]">
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {phase === "typing-response" ? typedResponse : convo.snippet}
-                    {phase === "typing-response" && <span className="inline-block w-[2px] h-3 bg-muted-foreground/60 ml-0.5 align-middle animate-pulse" />}
-                  </p>
-                  {showUrl && (
-                    <span className="relative inline-flex items-center gap-2 mt-1.5">
-                      <motion.span
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 20,
-                        }}
-                        className="inline-block text-xs font-medium px-2 py-0.5 rounded-md"
-                        style={{
-                          color: vendor.color,
-                          backgroundColor: `${vendor.color}15`,
-                          borderWidth: 1,
-                          borderColor: `${vendor.color}30`,
-                        }}
-                      >
-                        ↗ {convo.url}
-                      </motion.span>
-                      <motion.span
-                        initial={{ opacity: 0, x: -6 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3, duration: 0.35, ease: "easeOut" }}
-                        className="text-[10px] text-primary font-medium whitespace-nowrap flex items-center gap-0.5"
-                      >
-                        <span>←</span>
-                        <motion.span animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
-                          this could be you
-                        </motion.span>
-                      </motion.span>
-                    </span>
-                  )}
+                <div className="h-12 px-5 rounded-md bg-primary text-primary-foreground font-semibold text-sm flex items-center gap-2 justify-center">
+                  Scan my site
+                  <ArrowRight className="h-4 w-4" />
                 </div>
-              </motion.div>
-            )}
-          </div>
-
-          {/* Input bar at the bottom */}
-          <div className="px-3 pb-3">
-            <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-secondary/30 px-3 py-2">
-              <p className="flex-1 text-[13px] text-foreground/70 truncate min-h-[20px]">
-                {phase === "typing-input" && (
-                  <>
-                    {typedInput}
-                    <span className="inline-block w-[2px] h-3.5 bg-foreground/50 ml-0.5 align-middle animate-pulse" />
-                  </>
-                )}
-                {phase === "send-click" && <span className="text-foreground/50">{convo.question}</span>}
-                {!["typing-input", "send-click"].includes(phase) && <span className="text-muted-foreground/30">Ask anything...</span>}
+              </div>
+              <p className="text-xs text-muted-foreground mt-4 text-center">
+                No signup. No credit card. Just your website address.
               </p>
+            </motion.div>
+          )}
+
+          {stage === 1 && (
+            <motion.div
+              key="stage-1"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35 }}
+              className="w-full max-w-xl"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                {/* LLM checks column — left */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                      AI analysis
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {llmChecks.map((check, i) => {
+                      const isDone = llmCheckedCount > i;
+                      const isActive = llmCheckedCount === i;
+                      return (
+                        <motion.div
+                          key={check}
+                          className="flex items-center gap-2.5 py-1"
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                        >
+                          <div className="h-4 w-4 flex items-center justify-center shrink-0">
+                            {isDone ? (
+                              <motion.div
+                                initial={{ scale: 0, rotate: -90 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                              </motion.div>
+                            ) : isActive ? (
+                              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                            ) : (
+                              <div className="h-1.5 w-1.5 rounded-full bg-border" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-sm transition-colors ${
+                              isDone || isActive
+                                ? "text-foreground"
+                                : "text-muted-foreground/50"
+                            }`}
+                          >
+                            {check}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                    {/* Thinking indicator while LLM checks are running */}
+                    <AnimatePresence>
+                      {llmCheckedCount > 0 &&
+                        llmCheckedCount < llmChecks.length && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="flex items-center gap-2 pt-1.5 text-[11px] text-muted-foreground"
+                          >
+                            <motion.div
+                              className="flex gap-0.5"
+                              animate={{ opacity: [0.4, 1, 0.4] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                            >
+                              <span>AI is reading your content</span>
+                              <span>...</span>
+                            </motion.div>
+                          </motion.div>
+                        )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                {/* Automated checks column — right */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                      Automated checks
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {autoChecks.map((check, i) => {
+                      const isDone = autoCheckedCount > i;
+                      const isActive = autoCheckedCount === i;
+                      return (
+                        <motion.div
+                          key={check}
+                          className="flex items-center gap-2.5 py-1"
+                          initial={{ opacity: 0, x: -8 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                        >
+                          <div className="h-4 w-4 flex items-center justify-center shrink-0">
+                            {isDone ? (
+                              <motion.div
+                                initial={{ scale: 0, rotate: -90 }}
+                                animate={{ scale: 1, rotate: 0 }}
+                                transition={{ type: "spring", stiffness: 300 }}
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                              </motion.div>
+                            ) : isActive ? (
+                              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin" />
+                            ) : (
+                              <div className="h-1.5 w-1.5 rounded-full bg-border" />
+                            )}
+                          </div>
+                          <span
+                            className={`text-sm transition-colors ${
+                              isDone || isActive ? "text-foreground" : "text-muted-foreground/50"
+                            }`}
+                          >
+                            {check}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {stage === 2 && (
+            <motion.div
+              key="stage-2"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.35 }}
+              className="w-full max-w-xl space-y-4"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                    AI Visibility
+                  </span>
+                  <span className="text-2xl font-bold text-destructive/70 tabular-nums leading-none">
+                    {visibilityScore}
+                    <span className="text-xs text-muted-foreground ml-0.5">/100</span>
+                  </span>
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest">
+                    AI Discoverability
+                  </span>
+                  <span className="text-2xl font-bold text-destructive/70 tabular-nums leading-none">
+                    {discoverabilityScore}
+                    <span className="text-xs text-muted-foreground ml-0.5">/100</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="h-px bg-border/40" />
+
+              <div>
+                <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2.5">
+                  Top blockers
+                </p>
+                <div className="space-y-2">
+                  {[
+                    {
+                      title: "AI doesn't know what your business does",
+                      sub: "Homepage missing clear value prop, audience, and location",
+                    },
+                    {
+                      title: "No structured data found",
+                      sub: "Add Organization schema, ready-to-paste code in Pro",
+                    },
+                    {
+                      title: "Content doesn't match AI questions",
+                      sub: "No FAQ, no problem-solution structure",
+                    },
+                  ].map((b, i) => (
+                    <motion.div
+                      key={b.title}
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.35 + i * 0.1 }}
+                      className="flex gap-2.5 items-start"
+                    >
+                      <XCircle className="h-3.5 w-3.5 text-destructive/70 shrink-0 mt-[3px]" />
+                      <div className="min-w-0 leading-tight">
+                        <p className="text-[13px] font-medium text-foreground">
+                          {b.title}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {b.sub}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+
               <motion.div
-                animate={{
-                  scale: sendPressed ? 0.85 : 1,
-                  backgroundColor: sendPressed ? vendor.color : phase === "typing-input" && typedInput.length > 0 ? `${vendor.color}cc` : `${vendor.color}33`,
-                }}
-                transition={{ duration: 0.1 }}
-                className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.8 }}
+                className="flex items-center justify-between pt-2 text-xs"
               >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-foreground/80"
-                >
-                  <path d="M22 2L11 13" />
-                  <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-                </svg>
+                <span className="text-muted-foreground">
+                  <span className="font-semibold text-foreground tabular-nums">45</span> more checks available
+                </span>
+                <span className="inline-flex items-center gap-1 font-medium text-primary">
+                  Unlock full audit
+                  <ArrowRight className="h-3 w-3" />
+                </span>
               </motion.div>
-            </div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-    </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </div>
   );
-}
-
-function AnimatedScore({ score }: { score: number }) {
-  const motionVal = useMotionValue(0);
-  const springVal = useSpring(motionVal, { stiffness: 60, damping: 20 });
-  const display = useTransform(springVal, (v) => `${Math.round(v)}%`);
-
-  useEffect(() => {
-    motionVal.set(score);
-  }, [score, motionVal]);
-
-  return <motion.span>{display}</motion.span>;
 }
 
 function GlowOrb({ className }: { className: string }) {
@@ -487,26 +485,57 @@ function CyclingWord({ words }: { words: string[] }) {
   );
 }
 
+function CyclingVendor() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % vendors.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const longest = vendors.reduce((a, b) => (a.name.length >= b.name.length ? a : b)).name;
+
+  return (
+    <span className="relative inline-block align-baseline">
+      <span className="invisible" aria-hidden>
+        {longest}
+      </span>
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.span
+          key={index}
+          className="absolute left-0 top-0 whitespace-nowrap"
+          style={{ color: vendors[index].color }}
+          initial={{ y: "100%", opacity: 0 }}
+          animate={{ y: "0%", opacity: 1 }}
+          exit={{ y: "-110%", opacity: 0 }}
+          transition={{ duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {vendors[index].name}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
+}
+
 export default function Home() {
-  const [email, setEmail] = useState("");
+  const router = useRouter();
   const [website, setWebsite] = useState("");
   const [loading, setLoading] = useState(false);
-  const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState("");
-  const reportRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setLoading(true);
       setError("");
-      setReport(null);
 
       try {
         const res = await fetch("/api/check", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, website }),
+          body: JSON.stringify({ website }),
         });
 
         if (!res.ok) {
@@ -515,17 +544,13 @@ export default function Home() {
         }
 
         const data = await res.json();
-        setReport(data);
-        setTimeout(() => {
-          reportRef.current?.scrollIntoView({ behavior: "smooth" });
-        }, 100);
+        router.push(`/results/${data.id}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong");
-      } finally {
         setLoading(false);
       }
     },
-    [email, website],
+    [website, router],
   );
 
   return (
@@ -584,362 +609,761 @@ export default function Home() {
         </div>
       </motion.nav>
 
-      {/* Hero — two columns: copy left, terminals right */}
-      <section className="pt-28 pb-12 px-6 relative">
-        <div className="mx-auto max-w-6xl grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          {/* Left: copy */}
-          <div>
-            <motion.p
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-sm font-mono text-primary mb-6 tracking-wide"
-            >
-              YOUR WEBSITE HAS A VISIBILITY PROBLEM
-            </motion.p>
+      {/* Hero — full-width copy, terminal below */}
+      <section className="pt-40 pb-24 px-6 relative overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-40 bg-[url('/website-ready-for-ai.jpg')] bg-cover bg-center"
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-background/30 via-background/55 to-background"
+        />
+        <div className="mx-auto max-w-6xl relative">
+          <motion.p
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-sm font-mono text-primary mb-6 tracking-wide"
+          >
+            FOR BUSINESSES THAT WANT TO BE FOUND BY AI, NOT JUST GOOGLE
+          </motion.p>
 
-            <motion.h1
-              className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.15] mb-6"
-              initial="hidden"
-              animate="visible"
-              variants={staggerContainer}
+          <motion.h1
+            className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.15] mb-6"
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainer}
+          >
+            <motion.span
+              className="block"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0 }}
             >
-              <motion.span className="block" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0 }}>
-                People stopped
-              </motion.span>
-              <CyclingWord words={["googling.", "searching.", "browsing."]} />
-              <motion.span className="block" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.24 }}>
-                They started <span className="text-primary">asking.</span>
-              </motion.span>
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="text-lg text-muted-foreground leading-relaxed"
+              Your next customer is asking <CyclingVendor />
+            </motion.span>
+            <motion.span
+              className="block"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.24 }}
             >
-              Your customers already use ChatGPT, Grok, and Perplexity to find tools and services. When they ask &quot;what&apos;s the best tool for X&quot;,
-              the AI only pulls from sites it can actually read.
-            </motion.p>
-          </div>
+              Are you the answer?
+            </motion.span>
+          </motion.h1>
 
-          {/* Right: typing terminal */}
-          <div>
-            <TypingTerminal convos={terminalConvos} />
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.6, delay: 0.5 }}
+            className="text-lg text-muted-foreground leading-relaxed max-w-3xl"
+          >
+            Get an AI visibility report in 30 seconds. See whether ChatGPT and other AI tools can read,
+            understand and recommend your website.
+          </motion.p>
+
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.6 }}
+            className="mt-10 w-full"
+          >
+            <div className="flex flex-col lg:flex-row lg:items-stretch gap-4">
+              <div className="flex flex-col sm:flex-row gap-3 lg:w-1/2">
+                <Input
+                  type="text"
+                  placeholder="yourwebsite.com"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  required
+                  className="h-14 text-lg flex-1 bg-secondary/50 border-border/60 focus-visible:ring-primary/30"
+                />
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="h-14 px-8 text-base font-semibold whitespace-nowrap"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Scanning…
+                    </>
+                  ) : (
+                    <>
+                      Scan my site
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <div className="flex-1 flex items-center justify-between gap-4 h-14 px-6 rounded-md border border-border/60 bg-secondary/30 backdrop-blur-sm">
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-primary shadow-[0_0_0_3px] shadow-primary/20" />
+                  <span className="text-foreground font-medium">Free</span>
+                  <span className="text-muted-foreground hidden md:inline">· No signup required</span>
+                </div>
+                <Separator orientation="vertical" className="self-stretch h-auto" />
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-base font-semibold text-foreground tabular-nums">1,200+</span>
+                  <span className="text-xs text-muted-foreground">sites scanned</span>
+                </div>
+                <Separator orientation="vertical" className="self-stretch h-auto hidden md:block" />
+                <div className="hidden md:flex items-baseline gap-1.5">
+                  <span className="text-base font-semibold text-foreground tabular-nums">30s</span>
+                  <span className="text-xs text-muted-foreground">to results</span>
+                </div>
+              </div>
+            </div>
+            {error && <p className="text-sm text-destructive mt-2">{error}</p>}
+          </motion.form>
+        </div>
+      </section>
+
+      {/* Why it matters */}
+      <section id="why" className="py-20 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                title: "ChatGPT is replacing Google",
+                body: "Sites like ChatGPT, Perplexity, and Claude don't show ten blue links. They recommend one or two. If you're not one of them, you don't get the click.",
+              },
+              {
+                title: "AI needs structure, not only content",
+                body: "AI agents look for machine-readable files like /skill.md and agent.json to figure out what your site does and whether it's worth recommending.",
+              },
+              {
+                title: "Your competitors aren't ready",
+                body: "Almost no one has set up their site for AI agents. Do it now and you're ahead of 99% of your industry before this becomes table stakes.",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="group relative rounded-xl border border-border/60 bg-secondary/20 px-6 py-5 hover:border-primary/40 hover:bg-secondary/30 transition-colors"
+              >
+                <div>
+                  <h3 className="text-base font-semibold text-foreground mb-1 leading-snug flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+                    {item.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {item.body}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* Optimise for */}
-      <section className="py-16 px-6 border-t border-border/40">
-        <div className="mx-auto max-w-3xl text-center">
+      {/* The problem */}
+      <section className="py-24 px-6 border-t border-border/40 bg-secondary/20">
+        <div className="mx-auto max-w-5xl">
           <motion.p
-            className="text-lg text-foreground font-medium mb-2"
+            className="text-xs font-mono font-bold text-foreground uppercase tracking-widest mb-6"
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            If your site isn&apos;t set up for AI agents, you won&apos;t show up.
+            The problem
           </motion.p>
+          <div className="grid md:grid-cols-[auto_1fr] gap-x-10 gap-y-6 items-start">
+            <motion.div
+              className="flex flex-col"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+            >
+              <span className="text-7xl md:text-8xl font-bold text-destructive/50 tabular-nums leading-none tracking-tight">
+                89%
+              </span>
+              <span className="text-xs font-mono text-muted-foreground uppercase tracking-widest mt-3">
+                Below 60 on first audit
+              </span>
+            </motion.div>
+            <motion.div
+              className="space-y-5 self-center"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <p className="text-2xl md:text-3xl font-semibold text-foreground leading-snug tracking-tight">
+                Of websites score below 60 on their first AI audit.
+                Most owners have no idea.
+              </p>
+              <p className="text-base text-muted-foreground leading-relaxed max-w-2xl">
+                AI doesn&apos;t rank your site. It either understands you, or it doesn&apos;t. Most sites fall into a
+                gap no one told them about. Yours might too. If your site isn&apos;t set up for AI agents,
+                you won&apos;t show up.
+              </p>
+              <motion.div
+                className="flex flex-wrap items-center gap-2.5 pt-2"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.35, duration: 0.5 }}
+              >
+                {vendors.map((v, i) => (
+                  <motion.span
+                    key={v.name}
+                    className="px-3.5 py-1.5 rounded-full border text-sm font-medium"
+                    style={{
+                      color: v.color,
+                      borderColor: `${v.color}33`,
+                      backgroundColor: `${v.color}0d`,
+                    }}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{
+                      delay: 0.4 + i * 0.06,
+                      type: "spring",
+                      stiffness: 180,
+                    }}
+                    whileHover={{
+                      scale: 1.06,
+                      borderColor: `${v.color}80`,
+                      backgroundColor: `${v.color}1a`,
+                      transition: { duration: 0.2 },
+                    }}
+                  >
+                    {v.name}
+                  </motion.span>
+                ))}
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Why AI ignores most sites */}
+      <section className="py-24 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-5xl">
           <motion.p
-            className="text-sm font-mono text-muted-foreground uppercase tracking-widest mb-6"
+            className="text-xs font-mono font-bold text-foreground uppercase tracking-widest mb-6"
             initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+          >
+            Why AI ignores most sites
+          </motion.p>
+          <motion.h2
+            className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight mb-4 max-w-3xl"
+            initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5, delay: 0.1 }}
           >
-            Optimise for the new search
-          </motion.p>
-          <motion.div
-            className="flex flex-wrap items-center justify-center gap-4"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            There are two reasons AI skips your site. Most tools only check one.
+          </motion.h2>
+          <motion.p
+            className="text-base text-muted-foreground leading-relaxed max-w-3xl mb-12"
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.15, duration: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
           >
-            {vendors.map((v, i) => (
-              <motion.span
-                key={v.name}
-                className="px-5 py-2.5 rounded-full border text-base font-medium"
-                style={{
-                  color: v.color,
-                  borderColor: `${v.color}33`,
-                  backgroundColor: `${v.color}0d`,
-                }}
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{
-                  delay: 0.2 + i * 0.08,
-                  type: "spring",
-                  stiffness: 180,
-                }}
-                whileHover={{
-                  scale: 1.08,
-                  borderColor: `${v.color}80`,
-                  backgroundColor: `${v.color}1a`,
-                  transition: { duration: 0.2 },
-                }}
-              >
-                {v.name}
-              </motion.span>
-            ))}
-          </motion.div>
+            Can AI read your site is different from will AI recommend you. They&apos;re separate problems
+            with different timelines, and fixing the wrong one first wastes months.
+          </motion.p>
 
-          {/* Audit now CTA */}
-          <motion.a
-            href="#audit"
-            className="inline-flex items-center gap-2 mt-10 px-6 py-3 rounded-lg bg-primary text-white font-semibold text-base hover:bg-primary/90 transition-colors"
+          <div className="grid md:grid-cols-2 gap-5">
+            {[
+              {
+                label: "AI Visibility Score",
+                score: 47,
+                question: "Can AI agents access, read, and parse your content?",
+                problem: "Problem 1 · fix in days",
+              },
+              {
+                label: "AI Discoverability Score",
+                score: 31,
+                question: "Will AI actually recommend you when someone asks?",
+                problem: "Problem 2 · fix in weeks",
+              },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: 0.3 + i * 0.1 }}
+                className="relative rounded-xl border border-border/60 bg-secondary/20 p-8 hover:border-primary/40 transition-colors"
+              >
+                <p className="text-xs font-mono text-muted-foreground uppercase tracking-widest mb-4">
+                  {item.label}
+                </p>
+                <div className="flex items-baseline gap-2 mb-5">
+                  <span className="text-6xl font-bold text-destructive/60 tabular-nums leading-none tracking-tight">
+                    {item.score}
+                  </span>
+                  <span className="text-xl font-semibold text-muted-foreground tabular-nums">
+                    /100
+                  </span>
+                </div>
+                <p className="text-base text-foreground leading-snug mb-4">
+                  {item.question}
+                </p>
+                <p className="text-xs font-mono text-primary uppercase tracking-widest">
+                  {item.problem}
+                </p>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.p
+            className="text-base text-muted-foreground leading-relaxed max-w-3xl mt-10"
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+          >
+            The gap between these two scores tells you which problem you actually have, and what to fix
+            first. <span className="text-foreground font-medium">Okfor.ai gives you both.</span>
+          </motion.p>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="py-24 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-5xl">
+          <motion.p
+            className="text-xs font-mono font-bold text-foreground uppercase tracking-widest mb-6"
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
+            transition={{ duration: 0.5 }}
           >
-            <motion.span
-              animate={{ opacity: [0.7, 1, 0.7] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-              className="flex items-center gap-2"
-            >
-              Audit your site now
-              <ArrowRight className="w-4 h-4" />
-            </motion.span>
-          </motion.a>
-        </div>
-      </section>
+            How it works
+          </motion.p>
+          <motion.h2
+            className="text-3xl md:text-4xl font-bold text-foreground tracking-tight leading-tight mb-12"
+            initial={{ opacity: 0, y: 15 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Three steps. Thirty seconds.
+          </motion.h2>
 
-      {/* Form section */}
-      <section id="audit" className="py-16 px-6 relative">
-        <div className="mx-auto max-w-lg">
           <motion.div
-            initial={{ opacity: 0, y: 40, scale: 0.97 }}
-            whileInView={{ opacity: 1, y: 0, scale: 1 }}
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            transition={{
-              duration: 0.6,
-              delay: 0.1,
-              ease: [0.25, 0.4, 0.25, 1] as const,
-            }}
-            className="relative"
+            transition={{ duration: 0.6, delay: 0.2 }}
           >
-            {/* Glow behind the card */}
-            <div className="absolute -inset-px rounded-xl bg-gradient-to-b from-primary/20 via-transparent to-transparent blur-sm pointer-events-none" />
-            <Card className="border-border/50 bg-card relative">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl">How visible is your site to AI?</CardTitle>
-                <CardDescription className="text-base">
-                  Drop your URL below. We check the three things AI agents look for and send you a report.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="website">Website URL</Label>
-                    <Input
-                      id="website"
-                      type="text"
-                      placeholder="yoursite.com"
-                      value={website}
-                      onChange={(e) => setWebsite(e.target.value)}
-                      required
-                      className="h-12 bg-secondary/50 text-base transition-shadow focus-visible:shadow-[0_0_0_3px_oklch(0.7_0.15_160_/_0.15)]"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email for your report</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="you@company.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="h-12 bg-secondary/50 text-base transition-shadow focus-visible:shadow-[0_0_0_3px_oklch(0.7_0.15_160_/_0.15)]"
-                    />
-                  </div>
-                  {error && (
-                    <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-destructive">
-                      {error}
-                    </motion.p>
-                  )}
-                  <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.985 }}>
-                    <Button type="submit" className="w-full h-12 text-base font-semibold relative overflow-hidden" disabled={loading}>
-                      {loading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Scanning your site...
-                        </>
-                      ) : (
-                        <span className="flex items-center justify-center">
-                          Run Free Check
-                          <ArrowRight className="ml-2 h-4 w-4" />
-                        </span>
-                      )}
-                    </Button>
-                  </motion.div>
-                  <p className="text-xs text-muted-foreground text-center pt-1">Takes about 30 seconds. No account needed.</p>
-                </form>
-              </CardContent>
-            </Card>
+            <HowItWorksAnimation />
           </motion.div>
         </div>
       </section>
 
-      {/* Report */}
-      <AnimatePresence>
-        {report && (
-          <motion.section
-            ref={reportRef}
-            className="pb-20 px-6"
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] as const }}
+      {/* Why we built this */}
+      <section className="py-20 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-5xl">
+          <motion.p
+            className="text-xs font-bold font-mono uppercase tracking-widest text-muted-foreground mb-4"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5 }}
           >
-            <div className="mx-auto max-w-2xl space-y-6">
-              <Card className="border-border/50 bg-card overflow-hidden">
-                <motion.div
-                  className={`h-1.5 origin-left ${report.score >= 66 ? "bg-green-500" : report.score >= 33 ? "bg-yellow-500" : "bg-red-500"}`}
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ duration: 0.6, delay: 0.2 }}
-                />
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Your Score</span>
-                    <span
-                      className={`text-4xl font-bold tabular-nums ${
-                        report.score >= 66 ? "text-green-400" : report.score >= 33 ? "text-yellow-400" : "text-red-400"
-                      }`}
-                    >
-                      <AnimatedScore score={report.score} />
-                    </span>
-                  </CardTitle>
-                  <CardDescription className="text-base">{report.website}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="w-full bg-secondary rounded-full h-2 mb-8">
-                    <motion.div
-                      className={`h-2 rounded-full ${report.score >= 66 ? "bg-green-500" : report.score >= 33 ? "bg-yellow-500" : "bg-red-500"}`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${report.score}%` }}
-                      transition={{
-                        duration: 0.8,
-                        delay: 0.4,
-                        ease: "easeOut",
-                      }}
-                    />
-                  </div>
-
-                  <motion.div className="space-y-3" initial="hidden" animate="visible" variants={staggerContainer}>
-                    {report.checks.map((check, i) => (
-                      <motion.div key={i} variants={scaleIn} className="flex items-start gap-3 p-4 rounded-lg border border-border/50 bg-secondary/30">
-                        {check.passed ? (
-                          <motion.div
-                            initial={{ rotate: -90, opacity: 0 }}
-                            animate={{ rotate: 0, opacity: 1 }}
-                            transition={{
-                              delay: 0.6 + i * 0.15,
-                              type: "spring",
-                            }}
-                          >
-                            <CheckCircle2 className="h-5 w-5 text-green-400 mt-0.5 shrink-0" />
-                          </motion.div>
-                        ) : (
-                          <motion.div
-                            initial={{ rotate: 90, opacity: 0 }}
-                            animate={{ rotate: 0, opacity: 1 }}
-                            transition={{
-                              delay: 0.6 + i * 0.15,
-                              type: "spring",
-                            }}
-                          >
-                            <XCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
-                          </motion.div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium">{check.name}</p>
-                          <p className="text-sm text-muted-foreground mt-0.5">{check.description}</p>
-                          {check.details && <p className="text-sm mt-1.5 text-muted-foreground/80">{check.details}</p>}
-                        </div>
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </CardContent>
-              </Card>
-            </div>
-          </motion.section>
-        )}
-      </AnimatePresence>
-
-      {/* Why it matters */}
-      <section id="why" className="py-20 px-6 border-t border-border/40 relative">
-        <div className="mx-auto max-w-3xl">
+            Why we built this
+          </motion.p>
           <motion.h2
             className="text-3xl font-bold tracking-tight mb-10"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
           >
-            Why this matters right now
+            Built by agency owners, for business owners.
           </motion.h2>
 
-          <div className="space-y-8 text-muted-foreground">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               {
-                title: "AI answers are replacing search results",
-                body: "Someone asks ChatGPT \"best project management tool for startups\" and it doesn't show ten blue links. It recommends one or two. If you're not one of them, you don't get the click.",
+                name: "Vincent",
+                role: "Web agency owner",
+                image: "/vincent.png",
+                xUrl: null as string | null,
+                quote: "I build websites for small businesses. When AI took off, I started noticing my clients weren't showing up in ChatGPT, even when they ranked well on Google. No tool could tell me why in plain language. So we built one.",
               },
               {
-                title: "Agents need structure, not just content",
-                body: null,
+                name: "Benjamin",
+                role: "Developer & co-founder",
+                image: "/benjamin.png",
+                xUrl: "https://x.com/digbenjamins",
+                quote: "Every check in this audit is something we wished we had two years ago. We got tired of guessing what AI engines want and started reverse-engineering it. Okfor.ai is the result.",
               },
-              {
-                title: "Most of your competitors haven't done this yet",
-                body: "Almost no one has set up their site for AI agents. Do it now and you're ahead of 99% of your space before this becomes table stakes.",
-              },
-            ].map((item, i) => (
+            ].map((person, i) => (
               <motion.div
-                key={i}
-                className="flex gap-5"
-                initial={{ opacity: 0, x: -30 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                key={person.name}
+                className="rounded-xl border border-border/60 bg-card p-6 flex flex-col"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.5, delay: i * 0.1 }}
               >
-                <motion.span
-                  className="text-2xl font-bold text-primary shrink-0 w-8"
-                  initial={{ opacity: 0, scale: 0 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{
-                    delay: 0.15 + i * 0.1,
-                    type: "spring",
-                    stiffness: 200,
-                  }}
-                >
-                  {i + 1}
-                </motion.span>
-                <div>
-                  <p className="text-foreground font-medium text-lg mb-1">{item.title}</p>
-                  {item.body ? (
-                    <p className="leading-relaxed">{item.body}</p>
-                  ) : (
-                    <p className="leading-relaxed">
-                      Good writing alone won&apos;t cut it. AI agents look for machine-readable files like{" "}
-                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">/skill.md</code> and{" "}
-                      <code className="text-primary/80 bg-primary/5 px-1.5 py-0.5 rounded text-sm">agent.json</code> to figure out what your site does and
-                      whether it&apos;s worth recommending.
-                    </p>
-                  )}
+                <p className="text-[15px] leading-relaxed text-foreground/90 flex-1">
+                  <span className="text-primary/30 font-serif text-xl leading-none mr-1">&ldquo;</span>
+                  {person.quote}
+                </p>
+                <div className="mt-6 flex items-center gap-3">
+                  <div className="relative h-10 w-10 rounded-full overflow-hidden bg-secondary shrink-0">
+                    <img
+                      src={person.image}
+                      alt={person.name}
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                        e.currentTarget.parentElement!.innerHTML = `<span class="flex items-center justify-center h-full w-full text-primary font-bold text-sm">${person.name[0]}</span>`;
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-sm text-foreground">{person.name}</p>
+                      {person.xUrl && (
+                        <a href={person.xUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                        </a>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{person.role}</p>
+                  </div>
                 </div>
               </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* What you get */}
+      <section className="py-20 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-5xl">
+          <motion.p
+            className="text-xs font-bold font-mono uppercase tracking-widest text-muted-foreground mb-4"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5 }}
+          >
+            What you get
+          </motion.p>
+          <motion.h2
+            className="text-3xl font-bold tracking-tight mb-3"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Here&apos;s what your results look like
+          </motion.h2>
+          <motion.p
+            className="text-muted-foreground mb-10 max-w-xl"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, delay: 0.15 }}
+          >
+            No fluff. Your scores, your blockers, and what to do next.
+          </motion.p>
+
+          <motion.div
+            className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-stretch"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            {/* Results mock — takes 3 cols */}
+            <div className="lg:col-span-3 rounded-xl border border-border/60 bg-card overflow-hidden">
+              {/* Browser bar */}
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/40 bg-secondary/30">
+                <div className="flex gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-border" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-border" />
+                  <div className="h-2.5 w-2.5 rounded-full bg-border" />
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <div className="text-[11px] text-muted-foreground font-mono bg-secondary/60 rounded px-3 py-0.5">
+                    okfor.ai/results
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-5 sm:p-6 space-y-5">
+                {/* Scores */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-border/40 p-4">
+                    <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+                      AI Visibility
+                    </p>
+                    <p className="text-3xl font-bold text-destructive/70 tabular-nums">
+                      47<span className="text-sm text-muted-foreground font-normal ml-1">/100</span>
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border/40 p-4">
+                    <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-2">
+                      AI Discoverability
+                    </p>
+                    <p className="text-3xl font-bold text-destructive/70 tabular-nums">
+                      31<span className="text-sm text-muted-foreground font-normal ml-1">/100</span>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Blockers */}
+                <div>
+                  <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-3">
+                    Top blockers
+                  </p>
+                  <div className="space-y-3">
+                    {[
+                      {
+                        title: "Missing skill.md file",
+                        sub: "Quick fix. Tells AI agents what your business does, 5 min setup",
+                        pass: "quick-fix" as const,
+                      },
+                      {
+                        title: "AI doesn't know what your business does",
+                        sub: "Homepage missing clear value prop, audience, and location",
+                        pass: false,
+                      },
+                      {
+                        title: "No structured data found",
+                        sub: "Add Organization schema, ready-to-paste code in Pro",
+                        pass: false,
+                      },
+                      {
+                        title: "Content doesn't match AI questions",
+                        sub: "No FAQ, no problem-solution structure",
+                        pass: false,
+                      },
+                    ].map((b) => (
+                      <div key={b.title} className="flex gap-2.5 items-start">
+                        {b.pass === "quick-fix" ? (
+                          <AlertCircle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-[3px]" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-destructive/70 shrink-0 mt-[3px]" />
+                        )}
+                        <div className="min-w-0 leading-tight">
+                          <p className="text-[13px] font-medium text-foreground">{b.title}</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{b.sub}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* More issues teaser */}
+                <div className="flex items-center justify-between pt-1 border-t border-border/30 text-xs">
+                  <span className="text-muted-foreground">
+                    <span className="font-semibold text-foreground tabular-nums">45</span> more checks available
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-medium text-primary">
+                    Unlock full audit
+                    <ArrowRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* CTA card — takes 2 cols */}
+            <div className="lg:col-span-2 rounded-xl border border-primary/20 bg-card p-6 sm:p-8 flex flex-col gap-5">
+              <div>
+                <p className="text-[10px] font-mono text-primary uppercase tracking-widest font-bold mb-3">
+                  Pro audit
+                </p>
+                <h3 className="text-xl font-bold tracking-tight mb-2">
+                  Get the full picture.
+                </h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Your free scan shows the scores and top blockers. Unlock Pro for the complete audit with every check,
+                  detailed fixes, and ready-to-paste code snippets.
+                </p>
+              </div>
+
+              <ul className="space-y-2 text-sm text-foreground/90">
+                {[
+                  "All 47 checks across 10 categories",
+                  "Step-by-step fix for every issue",
+                  "Copy-paste code for schema, robots.txt, skill.md",
+                  "Priority-ranked action plan",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-auto pt-2">
+                <a
+                  href="#audit"
+                  className="inline-flex items-center justify-center gap-2 w-full h-11 rounded-md bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+                >
+                  Unlock full audit for &euro;19
+                  <ArrowRight className="h-4 w-4" />
+                </a>
+                <p className="text-[11px] text-muted-foreground text-center mt-2.5">
+                  One-time payment. No subscription.
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section className="py-20 px-6 border-t border-border/40">
+        <div className="mx-auto max-w-3xl">
+          <motion.p
+            className="text-xs font-bold font-mono uppercase tracking-widest text-muted-foreground mb-4"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5 }}
+          >
+            FAQ
+          </motion.p>
+          <motion.h2
+            className="text-3xl font-bold tracking-tight mb-10"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Frequently Asked Questions
+          </motion.h2>
+
+          <div className="space-y-4">
+            {[
+              {
+                q: "Do I need technical skills to use this?",
+                a: "No. Every issue is written in plain language and comes with a concrete fix, no coding required.",
+              },
+              {
+                q: "What do I get with the free scan?",
+                a: "Both your AI Visibility Score and AI Discoverability Score, your top 3 blockers, and 3 quick wins you can act on today. No signup required.",
+              },
+              {
+                q: "What's included in the Pro audit?",
+                a: "All 47 checks with explanation and fix for each, AI-rewritten homepage copy, FAQ suggestions, schema.org code ready to paste, and a downloadable PDF report. One-time payment of \u20ac19, no subscription.",
+              },
+              {
+                q: "Does this work with my website platform?",
+                a: "Yes. Okfor.ai works on any website with a URL \u2014 WordPress, Squarespace, Webflow, Shopify, or any custom build.",
+              },
+              {
+                q: "How is this different from SEO tools?",
+                a: "SEO tools check if Google can rank you. Okfor.ai checks if AI can understand and recommend you. Different signals, different fixes. Most sites that rank well on Google still score poorly on AI readiness.",
+              },
+            ].map((item, i) => (
+              <motion.details
+                key={i}
+                className="group rounded-lg border border-border/60 bg-card"
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+              >
+                <summary className="flex items-center justify-between gap-4 px-5 py-4 cursor-pointer list-none text-[15px] font-medium text-foreground hover:text-primary transition-colors [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <svg
+                    className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </summary>
+                <div className="px-5 pb-4 text-sm text-muted-foreground leading-relaxed">
+                  {item.a}
+                </div>
+              </motion.details>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA scan section */}
+      <section id="audit" className="py-24 px-6 border-t border-border/40 bg-secondary/20">
+        <div className="mx-auto max-w-2xl text-center">
+          <motion.h2
+            className="text-3xl sm:text-4xl font-bold tracking-tight mb-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5 }}
+          >
+            Find out if AI can find you.
+            <br />
+            In 30 seconds.
+          </motion.h2>
+          <motion.p
+            className="text-muted-foreground mb-10 max-w-lg mx-auto"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+          >
+            Free. No signup. If you score below 85, you&apos;ll want to see the full report.
+          </motion.p>
+
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto"
+          >
+            <Input
+              type="text"
+              placeholder="yourwebsite.com"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+              required
+              className="h-12 flex-1 bg-background/60 text-base transition-shadow focus-visible:shadow-[0_0_0_3px_oklch(0.7_0.15_160_/_0.15)]"
+            />
+            <Button type="submit" className="h-12 px-6 text-base font-semibold shrink-0" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Scanning...
+                </>
+              ) : (
+                <span className="flex items-center gap-2">
+                  Scan my site
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              )}
+            </Button>
+          </motion.form>
+          {error && (
+            <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-sm text-destructive mt-3">
+              {error}
+            </motion.p>
+          )}
+          <p className="text-xs text-muted-foreground mt-4">
+            Free · Takes 30 seconds · No credit card
+          </p>
         </div>
       </section>
 

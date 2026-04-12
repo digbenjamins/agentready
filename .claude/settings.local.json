@@ -27,7 +27,8 @@
       "Bash(mv lib/checks/b-content.ts server/checks/content.ts)",
       "Bash(mv lib/checks/c-structure.ts server/checks/structure.ts)",
       "Bash(ls d:/agentready/apps/web/.env*)",
-      "Bash(ls d:/agentready/.env*)"
+      "Bash(ls d:/agentready/.env*)",
+      "Bash(grep -c \"slug:\" src/content/checks/*.ts)"
     ]
   }
 }

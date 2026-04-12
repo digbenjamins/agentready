@@ -3,19 +3,19 @@ import { runAllChecks, calculateScore } from "@/server/checks";
 import { createSubmission, saveChecks, completeSubmission } from "@/server/services/submission";
 
 export async function POST(req: NextRequest) {
-  const { email, website } = await req.json();
+  const { website } = await req.json();
 
-  if (!email || !website) {
-    return NextResponse.json({ error: "Email and website are required" }, { status: 400 });
+  if (!website) {
+    return NextResponse.json({ error: "Website is required" }, { status: 400 });
   }
 
-  const submission = await createSubmission(email, website);
+  const submission = await createSubmission(website);
 
   const { checks } = await runAllChecks(website);
   const score = await calculateScore(checks);
 
   await saveChecks(submission.id, checks);
-  await completeSubmission(submission.id);
+  await completeSubmission(submission.id, score);
 
   // Map to frontend-friendly format
   const formattedChecks = checks.map((c) => ({

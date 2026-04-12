@@ -8,8 +8,10 @@ datasource db {
 
 model Submission {
   id        String   @id @default(uuid())
-  email     String
+  email     String?
   website   String
+  score     Int?
+  pro       Boolean  @default(false)
   status    String   @default("pending")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

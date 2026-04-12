@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { allChecks, categoryOrder, getChecksByCategory } from "@/content/checks";
+import { TerminalHero } from "./terminal-hero";
 
 export const metadata: Metadata = {
   title: "Knowledge Base — OkforAI",
@@ -23,7 +24,10 @@ export default function ChecksIndexPage() {
         </div>
       </nav>
 
-      <article className="mx-auto max-w-4xl px-6 py-16">
+      {/* Terminal hero */}
+      <TerminalHero checkCount={allChecks.length} />
+
+      <article id="checks" className="mx-auto max-w-4xl px-6 py-16">
         <p className="text-sm font-mono text-primary mb-4 tracking-wide uppercase">Knowledge base</p>
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-6">All checks</h1>
         <p className="text-xl text-muted-foreground leading-relaxed mb-12 max-w-2xl">

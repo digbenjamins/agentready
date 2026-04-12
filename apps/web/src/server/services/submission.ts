@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { CheckResult } from "@/server/checks/types";
 
-export async function createSubmission(email: string, website: string) {
+export async function createSubmission(website: string, email?: string) {
   return prisma.submission.create({
     data: {
-      email,
       website,
+      email: email || null,
       status: "checking",
     },
   });
@@ -23,10 +23,17 @@ export async function saveChecks(submissionId: string, checks: CheckResult[]) {
   });
 }
 
-export async function completeSubmission(submissionId: string) {
+export async function completeSubmission(submissionId: string, score?: number) {
   return prisma.submission.update({
     where: { id: submissionId },
-    data: { status: "completed" },
+    data: { status: "completed", score: score ?? null },
+  });
+}
+
+export async function addEmailToSubmission(submissionId: string, email: string) {
+  return prisma.submission.update({
+    where: { id: submissionId },
+    data: { email },
   });
 }
 
