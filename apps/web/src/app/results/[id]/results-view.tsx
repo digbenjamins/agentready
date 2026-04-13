@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, AlertCircle, Lock, ArrowRight, Loader2, Mail, Sparkles, BarChart3 } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Lock, ArrowRight, Loader2, Mail, Sparkles, BarChart3, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { MODEL_ICONS } from "@/components/model-icons";
 import Link from "next/link";
 
 interface Check {
@@ -33,12 +34,46 @@ function CheckMeta({ description }: { description: string }) {
   );
 }
 
+interface McdaReport {
+  queries: string[];
+  models: { id: string; label: string }[];
+  citations: {
+    query: string;
+    results: {
+      model: string;
+      cited: boolean;
+      citedSites: { domain: string; parameters: string }[];
+      rawResponse: string;
+    }[];
+  }[];
+  impactAnalysis: { model: string; signals: string }[];
+  modelReports: { model: string; report: string }[];
+  actionItems: {
+    title: string;
+    description: string;
+    priority: "high" | "medium" | "low";
+    agreedByCount: number;
+    models: string[];
+  }[];
+  summary: {
+    citedByCount: number;
+    queryHitCount: number;
+    topCompetitors: { domain: string; count: number }[];
+    consensusSites: string[];
+    modelGaps: { model: string; uniqueCitations: string[] }[];
+    verdict: string;
+  };
+  generatedAt: string;
+}
+
 interface Submission {
   id: string;
   website: string;
   score?: number | null;
   unlocked: boolean;
   hasEmail: boolean;
+  mcdaReport?: McdaReport | null;
+  mcdaStatus?: string | null;
   checks: Check[];
   stats: {
     totalChecks: number;
@@ -53,6 +88,500 @@ interface Submission {
       composite: "visibility" | "discoverability";
     }[];
   };
+}
+
+// ── Checks by Category (accordion, grouped by composite) ───
+
+const CATEGORY_LABELS: Record<string, string> = {
+  A: "Machine access",
+  B: "Content clarity",
+  C: "Structure",
+  D: "Entities & schema",
+  E: "Trust signals",
+  F: "Conversational fit",
+  G: "Crawl permissions",
+  H: "Extractability",
+  I: "Authority signals",
+  J: "Technical perf.",
+  K: "Agent readiness",
+};
+
+function ChecksByCategory({
+  checks,
+  categoryScores,
+}: {
+  checks: Check[];
+  categoryScores: Submission["stats"]["categoryScores"];
+}) {
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  const toggle = (cat: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      next.has(cat) ? next.delete(cat) : next.add(cat);
+      return next;
+    });
+
+  // Group checks by category
+  const grouped = new Map<string, Check[]>();
+  for (const check of checks) {
+    const meta = parseCheckMeta(check.description);
+    const cat = meta?.category || "?";
+    if (!grouped.has(cat)) grouped.set(cat, []);
+    grouped.get(cat)!.push(check);
+  }
+
+  const visibilityCats = categoryScores.filter((c) => c.composite === "visibility").sort((a, b) => a.category.localeCompare(b.category));
+  const discoverabilityCats = categoryScores.filter((c) => c.composite === "discoverability").sort((a, b) => a.category.localeCompare(b.category));
+
+  function renderGroup(label: string, cats: typeof categoryScores) {
+    return (
+      <div className="mb-6">
+        <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-3">
+          {label}
+        </p>
+        <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
+          {cats.map((cat, idx) => {
+            const catChecks = grouped.get(cat.category) || [];
+            const passed = catChecks.filter((c) => c.passed).length;
+            const total = catChecks.length;
+            const pct = cat.maxPts > 0 ? (cat.earned / cat.maxPts) * 100 : 0;
+            const isOpen = open.has(cat.category);
+
+            return (
+              <div key={cat.category} className={idx > 0 ? "border-t border-border/30" : ""}>
+                <button
+                  onClick={() => toggle(cat.category)}
+                  className="flex items-center gap-3 w-full px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {CATEGORY_LABELS[cat.category] || cat.category}
+                      </p>
+                      <span className="text-[9px] font-mono text-muted-foreground/50">{cat.category}</span>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <div className="flex-1 h-1.5 rounded-full bg-muted/40 overflow-hidden max-w-[120px]">
+                        <div
+                          className={`h-full rounded-full ${
+                            pct >= 80 ? "bg-primary" : pct >= 50 ? "bg-amber-500" : "bg-destructive/70"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] tabular-nums text-muted-foreground">
+                        {cat.earned}/{cat.maxPts} pts
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`text-xs tabular-nums ${passed === total ? "text-primary" : "text-muted-foreground"}`}>
+                    {passed}/{total}
+                  </span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-4 space-y-2">
+                    {catChecks.map((check) => (
+                      <div
+                        key={check.id}
+                        className="flex gap-3 items-start rounded-lg bg-muted/20 px-4 py-2.5"
+                      >
+                        {check.passed ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-destructive/70 shrink-0 mt-0.5" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium text-foreground">{check.name}</p>
+                          {check.details && (
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{check.details}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      className="mb-10"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.2 }}
+    >
+      <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-4">
+        All checks
+      </p>
+      {renderGroup("AI Visibility", visibilityCats)}
+      {renderGroup("AI Discoverability", discoverabilityCats)}
+    </motion.div>
+  );
+}
+
+// ── MCDA Report Section ────────────────────────────────────
+
+/** Model label with icon */
+function ModelLabel({ modelKey, label, className = "text-xs" }: { modelKey: string; label: string; className?: string }) {
+  const Icon = MODEL_ICONS[modelKey];
+  return (
+    <span className={`inline-flex items-center gap-1.5 font-medium text-foreground ${className}`}>
+      {Icon && <Icon className="h-3.5 w-3.5" />}
+      {label}
+    </span>
+  );
+}
+
+/** Reusable collapsible card for MCDA sections */
+function CollapsibleCard({
+  title,
+  subtitle,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card overflow-hidden mb-4">
+      <button
+        onClick={onToggle}
+        className="flex items-center justify-between w-full px-5 py-3.5 text-left hover:bg-muted/20 transition-colors"
+      >
+        <div>
+          <p className="text-xs font-medium text-foreground">{title}</p>
+          {subtitle && <p className="text-[10px] text-muted-foreground mt-0.5">{subtitle}</p>}
+        </div>
+        <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+      </button>
+      {isOpen && <div className="border-t border-border/30">{children}</div>}
+    </div>
+  );
+}
+
+function McdaSection({ submission }: { submission: Submission }) {
+  const [polling, setPolling] = useState(submission.mcdaStatus === "processing");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["actions", "matrix"]));
+  const report = submission.mcdaReport as McdaReport | null;
+
+  const toggle = (key: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  // Poll for report completion
+  useEffect(() => {
+    if (!polling) return;
+    let cancelled = false;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/submission/${submission.id}/mcda-status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.status === "completed" || data.status === "failed") {
+          setPolling(false);
+          if (data.status === "completed") window.location.reload();
+        }
+      } catch { /* ignore */ }
+    }, 5000);
+    const timeout = setTimeout(() => { if (!cancelled) setPolling(false); }, 120_000);
+    return () => { cancelled = true; clearInterval(interval); clearTimeout(timeout); };
+  }, [polling, submission.id]);
+
+  // Processing state
+  if (submission.mcdaStatus === "processing" || polling) {
+    return (
+      <motion.div
+        className="mb-10 rounded-xl border border-primary/20 bg-gradient-to-b from-card to-primary/[0.03] p-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <Loader2 className="h-5 w-5 text-primary animate-spin" />
+          <p className="text-sm font-medium text-foreground">Generating your multi-AI citation report...</p>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          We are querying 8 AI models (GPT, Claude, Gemini, Grok, Perplexity, Copilot, Mistral, Llama) with 10 real prompts in your niche. This takes about a minute.
+        </p>
+      </motion.div>
+    );
+  }
+
+  // No report yet (old submission or failed)
+  if (!report) {
+    if (submission.mcdaStatus === "failed") {
+      return (
+        <motion.div
+          className="mb-10 rounded-xl border border-border/60 bg-card p-6"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <p className="text-sm font-medium text-foreground">Multi-AI citation analysis</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Report generation failed. Try refreshing the page to restart.
+          </p>
+        </motion.div>
+      );
+    }
+    return null;
+  }
+
+  const { summary, citations, impactAnalysis, modelReports, models } = report;
+  const modelLabels: Record<string, string> = {};
+  for (const m of models) modelLabels[m.id] = m.label;
+
+  return (
+    <motion.div
+      className="mb-10"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.3 }}
+    >
+      <p className="text-[10px] font-mono text-primary uppercase tracking-widest mb-4">
+        Multi-AI citation analysis
+      </p>
+
+      {/* Verdict (always visible) */}
+      <div className="rounded-xl border border-primary/20 bg-gradient-to-b from-card to-primary/[0.03] p-6 mb-4">
+        <div className="flex items-center gap-6 mb-4">
+          <div className="text-center">
+            <p className={`text-3xl font-bold tabular-nums ${summary.citedByCount >= 6 ? "text-primary" : summary.citedByCount >= 3 ? "text-amber-500" : "text-destructive/70"}`}>
+              {summary.citedByCount}<span className="text-lg text-muted-foreground font-normal">/8</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">models cite you</p>
+          </div>
+          <div className="text-center">
+            <p className={`text-3xl font-bold tabular-nums ${summary.queryHitCount >= 7 ? "text-primary" : summary.queryHitCount >= 3 ? "text-amber-500" : "text-destructive/70"}`}>
+              {summary.queryHitCount}<span className="text-lg text-muted-foreground font-normal">/10</span>
+            </p>
+            <p className="text-[10px] text-muted-foreground">queries return you</p>
+          </div>
+        </div>
+        {summary.verdict && (
+          <p className="text-sm text-muted-foreground leading-relaxed">{summary.verdict}</p>
+        )}
+      </div>
+
+      {/* Consensus action items */}
+      {report.actionItems?.length > 0 && (
+        <CollapsibleCard
+          title="Action items"
+          subtitle={`${report.actionItems?.length ?? 0} improvements identified across 8 AI models`}
+          isOpen={openSections.has("actions")}
+          onToggle={() => toggle("actions")}
+        >
+          <div className="divide-y divide-border/20">
+            {report.actionItems.map((item, i) => {
+              const priorityColor = item.priority === "high"
+                ? "bg-destructive/10 text-destructive border-destructive/20"
+                : item.priority === "medium"
+                  ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+                  : "bg-muted text-muted-foreground border-border/40";
+              return (
+                <div key={i} className="px-5 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <span className={`shrink-0 mt-0.5 text-[9px] font-mono font-medium px-1.5 py-0.5 rounded border ${priorityColor}`}>
+                      {item.priority}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground">{item.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.description}</p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-[9px] font-mono text-muted-foreground/60">
+                          {item.agreedByCount}/8 models agree
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {item.models.map((m) => {
+                            const Icon = MODEL_ICONS[m];
+                            return Icon ? <Icon key={m} className="h-3 w-3" /> : null;
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* Citation matrix */}
+      <CollapsibleCard
+        title="Citation matrix"
+        subtitle="Does each AI model recommend you for these niche queries?"
+        isOpen={openSections.has("matrix")}
+        onToggle={() => toggle("matrix")}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border/30">
+                <th className="text-left px-5 py-2.5 font-medium text-muted-foreground w-[40%]">Query</th>
+                {models.map((m) => (
+                  <th key={m.id} className="text-center px-3 py-2.5 font-medium text-muted-foreground">
+                    <ModelLabel modelKey={m.id} label={m.label} className="text-[10px] justify-center" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {citations.map((entry, i) => (
+                <tr key={i} className="border-b border-border/20 last:border-b-0">
+                  <td className="px-5 py-2.5 text-foreground leading-snug">{entry.query}</td>
+                  {entry.results.map((r) => (
+                    <td key={r.model} className="text-center px-3 py-2.5">
+                      {r.cited ? (
+                        <CheckCircle2 className="h-4 w-4 text-primary inline-block" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-destructive/50 inline-block" />
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CollapsibleCard>
+
+      {/* Top competitors */}
+      {summary.topCompetitors.length > 0 && (
+        <CollapsibleCard
+          title="Competitors that get cited instead"
+          subtitle={`${summary.topCompetitors.length} competing domains found across all queries`}
+          isOpen={openSections.has("competitors")}
+          onToggle={() => toggle("competitors")}
+        >
+          <div className="divide-y divide-border/20">
+            {summary.topCompetitors.slice(0, 8).map((comp) => (
+              <div key={comp.domain} className="flex items-center justify-between px-5 py-2.5">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-foreground font-medium">{comp.domain}</p>
+                  {summary.consensusSites.includes(comp.domain) && (
+                    <span className="text-[9px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded">consensus</span>
+                  )}
+                </div>
+                <p className="text-xs tabular-nums text-muted-foreground">{comp.count}x cited</p>
+              </div>
+            ))}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* What each AI prioritizes */}
+      {impactAnalysis.length > 0 && (
+        <CollapsibleCard
+          title="What each AI prioritizes"
+          subtitle="Signal weights each model uses when recommending sites"
+          isOpen={openSections.has("impact")}
+          onToggle={() => toggle("impact")}
+        >
+          <div className="divide-y divide-border/20">
+            {impactAnalysis.map((ia) => (
+              <div key={ia.model}>
+                <button
+                  onClick={() => toggle(`impact-${ia.model}`)}
+                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <ModelLabel modelKey={ia.model} label={modelLabels[ia.model] || ia.model} />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`impact-${ia.model}`) ? "rotate-180" : ""}`} />
+                </button>
+                {openSections.has(`impact-${ia.model}`) && (
+                  <div className="px-5 pb-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{ia.signals}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* Suggestability reports */}
+      {modelReports.length > 0 && (
+        <CollapsibleCard
+          title="Suggestability reports"
+          subtitle="What each AI says about how to improve your site"
+          isOpen={openSections.has("reports")}
+          onToggle={() => toggle("reports")}
+        >
+          <div className="divide-y divide-border/20">
+            {modelReports.map((mr) => (
+              <div key={mr.model}>
+                <button
+                  onClick={() => toggle(`report-${mr.model}`)}
+                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <ModelLabel modelKey={mr.model} label={modelLabels[mr.model] || mr.model} />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`report-${mr.model}`) ? "rotate-180" : ""}`} />
+                </button>
+                {openSections.has(`report-${mr.model}`) && (
+                  <div className="px-5 pb-4">
+                    <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{mr.report}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* Model-specific citations */}
+      {summary.modelGaps.some((g) => g.uniqueCitations.length > 0) && (
+        <CollapsibleCard
+          title="Model-specific citations"
+          subtitle="Sites only one AI model recommends (the gap between models)"
+          isOpen={openSections.has("gaps")}
+          onToggle={() => toggle("gaps")}
+        >
+          <div className="divide-y divide-border/20">
+            {summary.modelGaps
+              .filter((g) => g.uniqueCitations.length > 0)
+              .map((g) => (
+                <div key={g.model}>
+                  <button
+                    onClick={() => toggle(`gap-${g.model}`)}
+                    className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-1.5">
+                      <ModelLabel modelKey={g.model} label={modelLabels[g.model] || g.model} />
+                      <span className="text-xs text-muted-foreground font-normal">only</span>
+                    </span>
+                    <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`gap-${g.model}`) ? "rotate-180" : ""}`} />
+                  </button>
+                  {openSections.has(`gap-${g.model}`) && (
+                    <div className="px-5 pb-4">
+                      <p className="text-xs text-muted-foreground">
+                        Only {modelLabels[g.model] || g.model} recommends: {g.uniqueCitations.join(", ")}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </div>
+        </CollapsibleCard>
+      )}
+    </motion.div>
+  );
 }
 
 export function ResultsView({ submission }: { submission: Submission }) {
@@ -325,7 +854,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
                 <BarChart3 className="h-5 w-5 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium text-foreground">Multi-AI citation analysis</p>
                 <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">
-                  We query GPT, Claude, Gemini &amp; Grok with real prompts in your niche. Multi-signal scoring reveals which AI recommends you, which skips you, and why.
+                  We query 8 AI models with real prompts in your niche. Multi-signal scoring reveals which AI recommends you, which skips you, and why.
                 </p>
                 <p className="text-[10px] text-primary font-medium mt-1.5">Pro only</p>
               </div>
@@ -389,7 +918,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
                 {[
                   { label: `All ${totalChecks} checks with detailed explanation`, highlight: false },
                   { label: "Fix instructions per failed check", highlight: false },
-                  { label: "Multi-AI citation report (GPT, Claude, Gemini, Grok)", highlight: true },
+                  { label: "Multi-AI citation report across 8 models", highlight: true },
                   { label: "Competitive benchmark vs. cited competitors", highlight: true },
                   { label: "Prioritized fix roadmap", highlight: false },
                   { label: "AI-rewritten homepage copy", highlight: false },
@@ -424,42 +953,11 @@ export function ResultsView({ submission }: { submission: Submission }) {
         </motion.div>
       )}
 
-      {/* Pro: all checks */}
-      {submission.unlocked && (
-        <motion.div
-          className="mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-        >
-          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-4">
-            All checks
-          </p>
-          <div className="space-y-2">
-            {submission.checks.map((check) => (
-              <div
-                key={check.id}
-                className="flex gap-3 items-start rounded-lg border border-border/60 bg-card px-5 py-3"
-              >
-                {check.passed ? (
-                  <CheckCircle2 className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                ) : (
-                  <XCircle className="h-4 w-4 text-destructive/70 shrink-0 mt-0.5" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-medium text-foreground">{check.name}</p>
-                    <CheckMeta description={check.description} />
-                  </div>
-                  {check.details && (
-                    <p className="text-xs text-muted-foreground mt-1">{check.details}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      )}
+      {/* Pro: all checks by category */}
+      {submission.unlocked && <ChecksByCategory checks={submission.checks} categoryScores={submission.stats.categoryScores} />}
+
+      {/* MCDA Report (Pro only) */}
+      {submission.unlocked && <McdaSection submission={submission} />}
 
       {/* Email unlock */}
       {!submission.unlocked && (
@@ -477,9 +975,13 @@ export function ResultsView({ submission }: { submission: Submission }) {
                   Check your email to unlock the full report
                 </p>
               </div>
-              <p className="text-xs text-muted-foreground mb-4">
+              <p className="text-xs text-muted-foreground mb-2">
                 We sent a link to your email. Click it to unlock all {submission.stats.totalChecks} checks with detailed fixes.
               </p>
+              <div className="flex items-center gap-2 mb-4 text-xs text-primary">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <p>Your multi-AI citation report is already being generated across 8 models.</p>
+              </div>
               <Link
                 href="/resend"
                 className="text-xs text-muted-foreground hover:text-foreground transition-colors"

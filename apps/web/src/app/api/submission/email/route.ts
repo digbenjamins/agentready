@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addEmailToSubmission } from "@/server/services/submission";
+import { generateMcdaReport } from "@/server/services/mcda";
 import { sendPasscodeEmail } from "@/server/email";
 import { validateEmail, checkRateLimit, getClientIp, parseJsonBody } from "@/server/security";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -51,6 +53,15 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("Failed to send email:", err);
     return NextResponse.json({ error: "Failed to send email, please try again" }, { status: 500 });
+  }
+
+  // Start MCDA generation in background so it's ready when they unlock
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    select: { website: true, mcdaStatus: true },
+  });
+  if (submission && !submission.mcdaStatus) {
+    generateMcdaReport(submissionId, submission.website).catch(console.error);
   }
 
   return NextResponse.json({ ok: true });

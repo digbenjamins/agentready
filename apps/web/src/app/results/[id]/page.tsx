@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSubmissionWithChecks, verifyUnlockToken, markEmailVerified } from "@/server/services/submission";
+import { generateMcdaReport } from "@/server/services/mcda";
 import { ResultsView } from "./results-view";
 
 interface DbCheck {
@@ -62,12 +63,16 @@ export default async function ResultsPage({
     notFound();
   }
 
-  // Check unlock token from URL
-  const isUnlocked = !!code && verifyUnlockToken(submission.passcode, code);
+  // Unlock via email token
+  const unlockedByCode = !!code && verifyUnlockToken(submission.passcode, code);
+  const isUnlocked = unlockedByCode;
 
-  // On first valid access, mark the email as verified
-  if (isUnlocked && !submission.emailVerified) {
+  // On first valid email access, mark the email as verified
+  if (unlockedByCode && !submission.emailVerified) {
     await markEmailVerified(id);
+    if (!submission.mcdaStatus) {
+      generateMcdaReport(id, submission.website).catch(console.error);
+    }
   }
 
   const checks = isUnlocked
@@ -113,6 +118,9 @@ export default async function ResultsPage({
     score: submission.score,
     unlocked: isUnlocked,
     hasEmail: !!submission.email,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mcdaReport: isUnlocked ? (submission.mcdaReport as any) : null,
+    mcdaStatus: isUnlocked ? submission.mcdaStatus : null,
     checks,
     stats: {
       totalChecks: submission.checks.length,

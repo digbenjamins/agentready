@@ -14,7 +14,9 @@ model Submission {
   pro           Boolean  @default(false)
   passcode      String?
   emailVerified Boolean  @default(false) @map("email_verified")
-  status        String   @default("pending")
+  status           String   @default("pending")
+  mcdaReport       Json?    @map("mcda_report")
+  mcdaStatus       String?  @map("mcda_status")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
   checks        Check[]
