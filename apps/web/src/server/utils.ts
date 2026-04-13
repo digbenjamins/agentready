@@ -1,4 +1,5 @@
 import type { SiteData } from "./checks/types";
+import { assertPublicHost } from "./security";
 
 // ── Fetching ─────────────────────────────────────────────
 
@@ -13,23 +14,44 @@ export function normalizeUrl(website: string): string {
   return url;
 }
 
+const MAX_REDIRECTS = 5;
+const REDIRECT_CODES = new Set([301, 302, 303, 307, 308]);
+
 export async function fetchUrl(url: string): Promise<{ ok: boolean; status: number; text: string; headers: Record<string, string>; responseTime: number }> {
   const start = Date.now();
   try {
-    const res = await fetch(url, {
-      method: "GET",
-      signal: AbortSignal.timeout(15000),
-      redirect: "follow",
-      headers: {
-        "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
-      },
-    });
-    const text = await res.text();
-    const headers: Record<string, string> = {};
-    res.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    return { ok: res.ok, status: res.status, text, headers, responseTime: Date.now() - start };
+    let currentUrl = url;
+
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      // SSRF protection: validate every URL we fetch (initial + redirects)
+      const hostname = new URL(currentUrl).hostname;
+      await assertPublicHost(hostname);
+
+      const res = await fetch(currentUrl, {
+        method: "GET",
+        signal: AbortSignal.timeout(8000),
+        redirect: "manual",
+        headers: {
+          "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
+        },
+      });
+
+      if (REDIRECT_CODES.has(res.status)) {
+        const location = res.headers.get("location");
+        if (!location) break;
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      const text = await res.text();
+      const headers: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return { ok: res.ok, status: res.status, text, headers, responseTime: Date.now() - start };
+    }
+
+    return { ok: false, status: 0, text: "", headers: {}, responseTime: Date.now() - start };
   } catch {
     return { ok: false, status: 0, text: "", headers: {}, responseTime: Date.now() - start };
   }
@@ -38,19 +60,37 @@ export async function fetchUrl(url: string): Promise<{ ok: boolean; status: numb
 export async function fetchHead(url: string): Promise<{ ok: boolean; status: number; headers: Record<string, string>; responseTime: number }> {
   const start = Date.now();
   try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(10000),
-      redirect: "follow",
-      headers: {
-        "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
-      },
-    });
-    const headers: Record<string, string> = {};
-    res.headers.forEach((value, key) => {
-      headers[key] = value;
-    });
-    return { ok: res.ok, status: res.status, headers, responseTime: Date.now() - start };
+    let currentUrl = url;
+
+    for (let i = 0; i <= MAX_REDIRECTS; i++) {
+      // SSRF protection: validate every URL we fetch (initial + redirects)
+      const hostname = new URL(currentUrl).hostname;
+      await assertPublicHost(hostname);
+
+      const res = await fetch(currentUrl, {
+        method: "HEAD",
+        signal: AbortSignal.timeout(8000),
+        redirect: "manual",
+        headers: {
+          "User-Agent": "OkforAI/1.0 (AI Readiness Checker)",
+        },
+      });
+
+      if (REDIRECT_CODES.has(res.status)) {
+        const location = res.headers.get("location");
+        if (!location) break;
+        currentUrl = new URL(location, currentUrl).toString();
+        continue;
+      }
+
+      const headers: Record<string, string> = {};
+      res.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+      return { ok: res.ok, status: res.status, headers, responseTime: Date.now() - start };
+    }
+
+    return { ok: false, status: 0, headers: {}, responseTime: Date.now() - start };
   } catch {
     return { ok: false, status: 0, headers: {}, responseTime: Date.now() - start };
   }

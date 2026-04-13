@@ -37,8 +37,8 @@ interface Submission {
   id: string;
   website: string;
   score?: number | null;
-  pro?: boolean;
-  email?: string | null;
+  unlocked: boolean;
+  hasEmail: boolean;
   checks: Check[];
   stats: {
     totalChecks: number;
@@ -58,9 +58,8 @@ interface Submission {
 export function ResultsView({ submission }: { submission: Submission }) {
   const [emailInput, setEmailInput] = useState("");
   const [emailSaving, setEmailSaving] = useState(false);
-  const [emailSaved, setEmailSaved] = useState(!!submission.email);
-
-  const isPro = submission.pro ?? false;
+  const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState("");
   const { visibilityScore, discoverabilityScore, totalChecks, categoryScores } = submission.stats;
 
   // Server already gated: revealed checks have full data, others are stripped
@@ -75,14 +74,25 @@ export function ResultsView({ submission }: { submission: Submission }) {
   async function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!emailInput.trim()) return;
+    // Honeypot check
+    const form = e.target as HTMLFormElement;
+    const hp = (form.querySelector('[name="company"]') as HTMLInputElement)?.value;
+    if (hp) return;
+
     setEmailSaving(true);
+    setEmailError("");
     try {
-      await fetch("/api/submission/email", {
+      const res = await fetch("/api/submission/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ submissionId: submission.id, email: emailInput }),
       });
-      setEmailSaved(true);
+      if (res.ok) {
+        setEmailSent(true);
+      } else {
+        const data = await res.json();
+        setEmailError(data.error || "Something went wrong, please try again.");
+      }
     } finally {
       setEmailSaving(false);
     }
@@ -179,7 +189,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
       </motion.div>
 
       {/* Top blockers (free + pro) */}
-      {!isPro && topBlockers.length > 0 && (
+      {!submission.unlocked && topBlockers.length > 0 && (
         <motion.div
           className="mb-6"
           initial={{ opacity: 0, y: 20 }}
@@ -212,7 +222,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
       )}
 
       {/* Quick fix (free only) */}
-      {!isPro && quickFix.length > 0 && (
+      {!submission.unlocked && quickFix.length > 0 && (
         <motion.div
           className="mb-8"
           initial={{ opacity: 0, y: 20 }}
@@ -243,7 +253,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
       )}
 
       {/* Locked section (free tier) */}
-      {!isPro && (
+      {!submission.unlocked && (
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 20 }}
@@ -415,7 +425,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
       )}
 
       {/* Pro: all checks */}
-      {isPro && (
+      {submission.unlocked && (
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 20 }}
@@ -451,31 +461,45 @@ export function ResultsView({ submission }: { submission: Submission }) {
         </motion.div>
       )}
 
-      {/* Email capture */}
-      {!submission.email && (
+      {/* Email unlock */}
+      {!submission.unlocked && (
         <motion.div
           className="rounded-xl border border-border/60 bg-secondary/20 p-6 mb-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.35 }}
         >
-          {emailSaved ? (
-            <div className="flex items-center gap-3 text-sm">
-              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-              <p className="text-foreground">We&apos;ll send a summary to your email.</p>
-            </div>
-          ) : (
+          {submission.hasEmail || emailSent ? (
             <>
               <div className="flex items-center gap-2 mb-3">
-                <Mail className="h-4 w-4 text-muted-foreground" />
+                <Mail className="h-4 w-4 text-primary" />
                 <p className="text-sm font-medium text-foreground">
-                  Get this report in your inbox
+                  Check your email to unlock the full report
                 </p>
               </div>
               <p className="text-xs text-muted-foreground mb-4">
-                We&apos;ll send you a copy of your scores and top findings. No spam.
+                We sent a link to your email. Click it to unlock all {submission.stats.totalChecks} checks with detailed fixes.
+              </p>
+              <Link
+                href="/resend"
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Didn&apos;t get it? Resend the email
+              </Link>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-3">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">
+                  Unlock your full report
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Enter your email to get an unlock link and reveal all {submission.stats.totalChecks} checks with detailed fixes. No spam.
               </p>
               <form onSubmit={handleEmailSubmit} className="flex gap-2">
+                <input type="text" name="company" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none" />
                 <Input
                   type="email"
                   placeholder="you@company.com"
@@ -485,9 +509,12 @@ export function ResultsView({ submission }: { submission: Submission }) {
                   className="h-10 flex-1 bg-background/60"
                 />
                 <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0" disabled={emailSaving}>
-                  {emailSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send"}
+                  {emailSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send link"}
                 </Button>
               </form>
+              {emailError && (
+                <p className="text-xs text-red-500 mt-2">{emailError}</p>
+              )}
             </>
           )}
         </motion.div>

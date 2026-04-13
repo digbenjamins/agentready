@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getSubmissionWithChecks } from "@/server/services/submission";
+import { getSubmissionWithChecks, verifyUnlockToken, markEmailVerified } from "@/server/services/submission";
 import { ResultsView } from "./results-view";
 
 interface DbCheck {
@@ -12,13 +12,9 @@ interface DbCheck {
 }
 
 /**
- * Server-side gating: free users only get top 3 blockers + 1 quick fix
+ * Server-side gating: locked users only get top 3 blockers + 1 quick fix
  * with full data. All other checks are stripped to pass/fail only (no
  * details), so nothing leaks to the client.
- *
- * Prioritization: top 3 blockers come from SEMI (LLM) checks first
- * (higher value, more impressive). Quick fix comes from AUTO checks
- * (easy win the user can act on immediately).
  */
 function gateChecksForFree(checks: DbCheck[]) {
   const isSemi = (c: DbCheck) => c.description.includes("— SEMI");
@@ -27,9 +23,7 @@ function gateChecksForFree(checks: DbCheck[]) {
   const failedSemi = failed.filter(isSemi);
   const failedAuto = failed.filter((c) => !isSemi(c));
 
-  // Top 3 blockers: prioritize SEMI, fill remainder with AUTO
   const topBlockers = [...failedSemi, ...failedAuto].slice(0, 3);
-  // Quick fix: first AUTO failure not already in blockers
   const blockerIds = new Set(topBlockers.map((c) => c.id));
   const quickFix = failedAuto.find((c) => !blockerIds.has(c.id));
 
@@ -42,7 +36,6 @@ function gateChecksForFree(checks: DbCheck[]) {
     if (revealedIds.has(c.id)) {
       return { ...c, revealed: true as const };
     }
-    // Strip details for locked checks, keep only pass/fail and name
     return {
       id: c.id,
       name: c.name,
@@ -54,22 +47,33 @@ function gateChecksForFree(checks: DbCheck[]) {
   });
 }
 
-export default async function ResultsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ResultsPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ code?: string }>;
+}) {
   const { id } = await params;
+  const { code } = await searchParams;
   const submission = await getSubmissionWithChecks(id);
 
   if (!submission || submission.status !== "completed") {
     notFound();
   }
 
-  const isPro = submission.pro ?? false;
-  const checks = isPro
+  // Check unlock token from URL
+  const isUnlocked = !!code && verifyUnlockToken(submission.passcode, code);
+
+  // On first valid access, mark the email as verified
+  if (isUnlocked && !submission.emailVerified) {
+    await markEmailVerified(id);
+  }
+
+  const checks = isUnlocked
     ? submission.checks.map((c) => ({ ...c, revealed: true as const }))
     : gateChecksForFree(submission.checks);
 
-  // Category config: points + which composite score it feeds
-  // Visibility = can AI find and read you? (infrastructure)
-  // Discoverability = will AI recommend you? (content + authority)
   const categoryConfig: Record<string, { label: string; maxPts: number; composite: "visibility" | "discoverability" }> = {
     A: { label: "Machine access",      maxPts: 15, composite: "visibility" },
     B: { label: "Content clarity",     maxPts: 20, composite: "discoverability" },
@@ -94,7 +98,6 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
     return { category: cat, label: cfg.label, earned, maxPts: cfg.maxPts, composite: cfg.composite };
   });
 
-  // Composite scores from meaningful category groupings
   const visibilityCats = categoryScores.filter((c) => c.composite === "visibility");
   const discoverabilityCats = categoryScores.filter((c) => c.composite === "discoverability");
 
@@ -104,17 +107,15 @@ export default async function ResultsPage({ params }: { params: Promise<{ id: st
     return max > 0 ? Math.round((earned / max) * 100) : 0;
   };
 
-  const totalChecks = submission.checks.length;
-
   const clientData = {
     id: submission.id,
     website: submission.website,
     score: submission.score,
-    pro: isPro,
-    email: submission.email,
+    unlocked: isUnlocked,
+    hasEmail: !!submission.email,
     checks,
     stats: {
-      totalChecks,
+      totalChecks: submission.checks.length,
       totalPassed: submission.checks.filter((c) => c.passed).length,
       visibilityScore: sumScore(visibilityCats),
       discoverabilityScore: sumScore(discoverabilityCats),

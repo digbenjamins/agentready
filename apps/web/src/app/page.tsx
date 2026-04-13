@@ -532,6 +532,11 @@ export default function Home() {
       setError("");
 
       try {
+        // Honeypot check
+        const form = e.target as HTMLFormElement;
+        const hp = (form.querySelector('[name="company"]') as HTMLInputElement)?.value;
+        if (hp) return;
+
         const res = await fetch("/api/check", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -671,6 +676,7 @@ export default function Home() {
             className="mt-10 w-full"
           >
             <div className="flex flex-col lg:flex-row lg:items-stretch gap-4">
+              <input type="text" name="company" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none" />
               <div className="flex flex-col sm:flex-row gap-3 lg:w-1/2">
                 <Input
                   type="text"
@@ -1334,6 +1340,7 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto"
           >
+            <input type="text" name="company" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none" />
             <Input
               type="text"
               placeholder="yourwebsite.com"

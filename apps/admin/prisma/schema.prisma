@@ -7,13 +7,17 @@ datasource db {
 }
 
 model Submission {
-  id        String   @id @default(uuid())
-  email     String
-  website   String
-  status    String   @default("pending")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  checks    Check[]
+  id            String   @id @default(uuid())
+  email         String?
+  website       String
+  score         Int?
+  pro           Boolean  @default(false)
+  passcode      String?
+  emailVerified Boolean  @default(false) @map("email_verified")
+  status        String   @default("pending")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  checks        Check[]
 
   @@map("submissions")
 }
