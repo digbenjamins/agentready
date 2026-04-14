@@ -48,6 +48,8 @@ interface McdaReport {
   }[];
   impactAnalysis: { model: string; signals: string }[];
   modelReports: { model: string; report: string }[];
+  impactSummaries?: Record<string, string>;
+  reportSummaries?: Record<string, string>;
   actionItems: {
     title: string;
     description: string;
@@ -344,7 +346,7 @@ function McdaSection({ submission }: { submission: Submission }) {
     return null;
   }
 
-  const { summary, citations, impactAnalysis, modelReports, models } = report;
+  const { summary, citations, impactAnalysis, modelReports, models, impactSummaries, reportSummaries } = report;
   const modelLabels: Record<string, string> = {};
   for (const m of models) modelLabels[m.id] = m.label;
 
@@ -487,60 +489,48 @@ function McdaSection({ submission }: { submission: Submission }) {
         </CollapsibleCard>
       )}
 
-      {/* What each AI prioritizes */}
+      {/* AI priorities summary */}
       {impactAnalysis.length > 0 && (
         <CollapsibleCard
           title="What each AI prioritizes"
-          subtitle="Signal weights each model uses when recommending sites"
-          isOpen={openSections.has("impact")}
-          onToggle={() => toggle("impact")}
+          subtitle="Top ranking signal per model. See full analysis in the in-depth section below."
+          isOpen={openSections.has("impact-summary")}
+          onToggle={() => toggle("impact-summary")}
         >
           <div className="divide-y divide-border/20">
-            {impactAnalysis.map((ia) => (
-              <div key={ia.model}>
-                <button
-                  onClick={() => toggle(`impact-${ia.model}`)}
-                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
-                >
-                  <ModelLabel modelKey={ia.model} label={modelLabels[ia.model] || ia.model} />
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`impact-${ia.model}`) ? "rotate-180" : ""}`} />
-                </button>
-                {openSections.has(`impact-${ia.model}`) && (
-                  <div className="px-5 pb-4">
-                    <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{ia.signals}</p>
-                  </div>
-                )}
-              </div>
-            ))}
+            {impactAnalysis.map((ia) => {
+              const oneLiner = impactSummaries?.[ia.model]
+                || ia.signals?.split("\n").find((l: string) => l.trim())?.slice(0, 140) || "";
+              return (
+                <div key={ia.model} className="flex items-start gap-3 px-5 py-2.5">
+                  <ModelLabel modelKey={ia.model} label={modelLabels[ia.model] || ia.model} className="shrink-0 w-28" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{oneLiner}</p>
+                </div>
+              );
+            })}
           </div>
         </CollapsibleCard>
       )}
 
-      {/* Suggestability reports */}
+      {/* Suggestability summary */}
       {modelReports.length > 0 && (
         <CollapsibleCard
-          title="Suggestability reports"
-          subtitle="What each AI says about how to improve your site"
-          isOpen={openSections.has("reports")}
-          onToggle={() => toggle("reports")}
+          title="Suggestability overview"
+          subtitle="Key takeaway per model. Full reports available in the in-depth section below."
+          isOpen={openSections.has("reports-summary")}
+          onToggle={() => toggle("reports-summary")}
         >
           <div className="divide-y divide-border/20">
-            {modelReports.map((mr) => (
-              <div key={mr.model}>
-                <button
-                  onClick={() => toggle(`report-${mr.model}`)}
-                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
-                >
-                  <ModelLabel modelKey={mr.model} label={modelLabels[mr.model] || mr.model} />
-                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`report-${mr.model}`) ? "rotate-180" : ""}`} />
-                </button>
-                {openSections.has(`report-${mr.model}`) && (
-                  <div className="px-5 pb-4">
-                    <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{mr.report}</div>
-                  </div>
-                )}
-              </div>
-            ))}
+            {modelReports.map((mr) => {
+              const oneLiner = reportSummaries?.[mr.model]
+                || mr.report?.split("\n").find((l: string) => l.trim())?.slice(0, 140) || "";
+              return (
+                <div key={mr.model} className="flex items-start gap-3 px-5 py-2.5">
+                  <ModelLabel modelKey={mr.model} label={modelLabels[mr.model] || mr.model} className="shrink-0 w-28" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">{oneLiner}</p>
+                </div>
+              );
+            })}
           </div>
         </CollapsibleCard>
       )}
@@ -577,6 +567,75 @@ function McdaSection({ submission }: { submission: Submission }) {
                   )}
                 </div>
               ))}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* In-depth research divider */}
+      {(impactAnalysis.length > 0 || modelReports.length > 0) && (
+        <div className="flex items-center gap-3 mt-6 mb-2">
+          <div className="flex-1 h-px bg-border/40" />
+          <p className="text-[10px] font-mono text-muted-foreground/60 uppercase tracking-widest shrink-0">
+            In-depth research
+          </p>
+          <div className="flex-1 h-px bg-border/40" />
+        </div>
+      )}
+
+      {/* Full: What each AI prioritizes */}
+      {impactAnalysis.length > 0 && (
+        <CollapsibleCard
+          title="What each AI prioritizes (full)"
+          subtitle="Complete signal weights each model uses when recommending sites"
+          isOpen={openSections.has("impact")}
+          onToggle={() => toggle("impact")}
+        >
+          <div className="divide-y divide-border/20">
+            {impactAnalysis.map((ia) => (
+              <div key={ia.model}>
+                <button
+                  onClick={() => toggle(`impact-${ia.model}`)}
+                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <ModelLabel modelKey={ia.model} label={modelLabels[ia.model] || ia.model} />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`impact-${ia.model}`) ? "rotate-180" : ""}`} />
+                </button>
+                {openSections.has(`impact-${ia.model}`) && (
+                  <div className="px-5 pb-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{ia.signals}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* Full: Suggestability reports */}
+      {modelReports.length > 0 && (
+        <CollapsibleCard
+          title="Suggestability reports (full)"
+          subtitle="Complete analysis from each AI on how to improve your site"
+          isOpen={openSections.has("reports")}
+          onToggle={() => toggle("reports")}
+        >
+          <div className="divide-y divide-border/20">
+            {modelReports.map((mr) => (
+              <div key={mr.model}>
+                <button
+                  onClick={() => toggle(`report-${mr.model}`)}
+                  className="flex items-center justify-between w-full px-5 py-3 text-left hover:bg-muted/20 transition-colors"
+                >
+                  <ModelLabel modelKey={mr.model} label={modelLabels[mr.model] || mr.model} />
+                  <ChevronDown className={`h-3 w-3 text-muted-foreground transition-transform ${openSections.has(`report-${mr.model}`) ? "rotate-180" : ""}`} />
+                </button>
+                {openSections.has(`report-${mr.model}`) && (
+                  <div className="px-5 pb-4">
+                    <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{mr.report}</div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         </CollapsibleCard>
       )}

@@ -33,6 +33,11 @@ interface ModelReport {
   report: string;
 }
 
+interface ModelSummaries {
+  impactSummaries: Record<string, string>;
+  reportSummaries: Record<string, string>;
+}
+
 export interface McdaReport {
   queries: string[];
   models: { id: ModelKey; label: string }[];
@@ -40,6 +45,8 @@ export interface McdaReport {
   impactAnalysis: ImpactAnalysis[];
   modelReports: ModelReport[];
   actionItems: ActionItem[];
+  impactSummaries?: Record<string, string>;
+  reportSummaries?: Record<string, string>;
   summary: {
     citedByCount: number;
     queryHitCount: number;
@@ -369,6 +376,64 @@ Rules:
   return [];
 }
 
+// ── Model summaries (one-liners) ──────────────────────────
+
+async function generateModelSummaries(
+  impactAnalysis: ImpactAnalysis[],
+  modelReports: ModelReport[],
+): Promise<ModelSummaries> {
+  const impactBlock = impactAnalysis
+    .map((ia) => `[${ia.model}]:\n${ia.signals.slice(0, 800)}`)
+    .join("\n\n");
+
+  const reportBlock = modelReports
+    .map((mr) => `[${mr.model}]:\n${mr.report.slice(0, 800)}`)
+    .join("\n\n");
+
+  const response = await queryModel(MODELS.gpt.id, [
+    {
+      role: "system",
+      content: `You summarize AI research findings into one-sentence takeaways per model.
+
+Return ONLY a JSON object with this shape:
+{
+  "impactSummaries": { "model_key": "one sentence", ... },
+  "reportSummaries": { "model_key": "one sentence", ... }
+}
+
+Rules:
+- Each summary must be exactly one sentence, max 120 characters.
+- Be specific and concrete, not generic. Mention the actual signal or recommendation.
+- Do not use em-dashes. Use commas or periods instead.
+- Return ONLY the JSON, no other text.`,
+    },
+    {
+      role: "user",
+      content: `Summarize these into one-sentence takeaways per model.
+
+IMPACT ANALYSES (what each AI prioritizes):
+${impactBlock}
+
+SUGGESTABILITY REPORTS (how to improve):
+${reportBlock}`,
+    },
+  ], 2000);
+
+  if (!response) return { impactSummaries: {}, reportSummaries: {} };
+
+  try {
+    const match = response.match(/\{[\s\S]*\}/);
+    if (!match) return { impactSummaries: {}, reportSummaries: {} };
+    const parsed = JSON.parse(match[0]) as ModelSummaries;
+    return {
+      impactSummaries: parsed.impactSummaries || {},
+      reportSummaries: parsed.reportSummaries || {},
+    };
+  } catch {
+    return { impactSummaries: {}, reportSummaries: {} };
+  }
+}
+
 // ── Main entry point ───────────────────────────────────────
 
 export async function generateMcdaReport(submissionId: string, websiteUrl: string): Promise<void> {
@@ -445,10 +510,11 @@ export async function generateMcdaReport(submissionId: string, websiteUrl: strin
     // Step 5: Cross-model comparison
     const summary = buildSummary(citations, targetDomain, modelKeys);
 
-    // Step 6: Verdict + consensus action items (parallel)
-    const [verdict, actionItems] = await Promise.all([
+    // Step 6: Verdict + consensus action items + model summaries (parallel)
+    const [verdict, actionItems, modelSummaries] = await Promise.all([
       generateVerdict(websiteUrl, summary, impactResults),
       generateActionItems(websiteUrl, impactResults, reportResults),
+      generateModelSummaries(impactResults, reportResults),
     ]);
     summary.verdict = verdict;
 
@@ -470,6 +536,8 @@ export async function generateMcdaReport(submissionId: string, websiteUrl: strin
       impactAnalysis: impactResults,
       modelReports: reportResults,
       actionItems,
+      impactSummaries: modelSummaries.impactSummaries,
+      reportSummaries: modelSummaries.reportSummaries,
       summary,
       generatedAt: new Date().toISOString(),
     };
