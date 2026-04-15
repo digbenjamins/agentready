@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, getClientIp, parseJsonBody } from "@/server/security";
-import { sendProReportEmail } from "@/server/email";
+import { sendReportReadyEmail } from "@/server/email";
 import { generateUnlockCode } from "@/server/services/submission";
 import { prisma } from "@/lib/prisma";
 
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
   // Always return success to avoid leaking whether a report exists
   if (submission) {
     generateUnlockCode(submission.id)
-      .then((code) => sendProReportEmail(email, submission.id, code))
+      .then((code) => sendReportReadyEmail(email, submission.id, code))
       .catch(console.error);
   }
 

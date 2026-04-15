@@ -20,7 +20,8 @@ const vendors = [
   { name: "Claude", color: "#d4a27f" },
   { name: "Gemini", color: "#8b6cf0" },
   { name: "Perplexity", color: "#20b8cd" },
-  { name: "Copilot", color: "#0078d4" },
+  { name: "Mistral", color: "#ff7000" },
+  { name: "Llama", color: "#6366f1" },
 ];
 
 function HowItWorksAnimation() {
@@ -1262,11 +1263,11 @@ export default function Home() {
               },
               {
                 q: "What do I get with the free scan?",
-                a: "Both your AI Visibility Score and AI Discoverability Score, your top 3 blockers, and 3 quick wins you can act on today. No signup required.",
+                a: "Both your AI Visibility Score and AI Discoverability Score, your top 3 blockers, and 1 quick win you can act on today. No signup required.",
               },
               {
                 q: "What's included in the Pro audit?",
-                a: "All 47 checks with explanation and fix for each, AI-rewritten homepage copy, FAQ suggestions, schema.org code ready to paste, and a downloadable PDF report. One-time payment of \u20ac19, no subscription.",
+                a: "All 49 checks with explanation and fix for each, a multi-AI citation report across 7 models (GPT, Claude, Gemini, Grok, Perplexity, Mistral, Llama), competitive benchmark, prioritized action items, and a fix roadmap. One-time payment of \u20ac19, no subscription.",
               },
               {
                 q: "Does this work with my website platform?",

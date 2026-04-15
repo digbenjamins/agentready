@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { getSubmissionWithChecks, verifyUnlockCode } from "@/server/services/submission";
+import { getSubmissionWithChecks, verifyUnlockCode, generateUnlockCode } from "@/server/services/submission";
 import { verifyStripePayment } from "@/server/services/payment";
 import { ResultsView } from "./results-view";
 
@@ -66,16 +66,12 @@ export default async function ResultsPage({
   // Unlock via secret code in URL (sent by email after payment)
   const unlockedByCode = !!code && submission.pro && verifyUnlockCode(submission.passcode, code);
 
-  // Stripe return URL — verify payment, generate code, redirect with code in URL
-  let paymentConfirmed = false;
+  // Stripe return URL — verify payment, set pro, generate code, redirect
   if (!unlockedByCode && session_id) {
-    const unlockCode = await verifyStripePayment(id, session_id);
-    if (unlockCode) {
-      redirect(`/results/${id}?code=${unlockCode}`);
-    }
-    // If null, webhook already processed. User should check their email.
-    if (submission.pro) {
-      paymentConfirmed = true;
+    const valid = await verifyStripePayment(id, session_id);
+    if (valid || submission.pro) {
+      const code = await generateUnlockCode(id);
+      redirect(`/results/${id}?code=${code}`);
     }
   }
 
@@ -123,7 +119,6 @@ export default async function ResultsPage({
     website: submission.website,
     score: submission.score,
     unlocked: isUnlocked,
-    paymentConfirmed,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mcdaReport: isUnlocked ? (submission.mcdaReport as any) : null,
     mcdaStatus: isUnlocked ? submission.mcdaStatus : null,

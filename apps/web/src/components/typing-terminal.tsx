@@ -9,7 +9,8 @@ const vendors = [
   { name: "Claude", color: "#d4a27f" },
   { name: "Gemini", color: "#8b6cf0" },
   { name: "Perplexity", color: "#20b8cd" },
-  { name: "Copilot", color: "#0078d4" },
+  { name: "Mistral", color: "#ff7000" },
+  { name: "Llama", color: "#6366f1" },
 ];
 
 interface Conversation {
@@ -51,7 +52,7 @@ export const terminalConvos: Conversation[] = [
     snippet: "Framer is excellent — design-forward with great performance out of the box.",
   },
   {
-    vendor: "Copilot",
+    vendor: "Mistral",
     question: "Best analytics besides Google Analytics?",
     url: "plausible.io",
     snippet: "Plausible is privacy-friendly and gives you the essentials without the bloat.",
@@ -87,7 +88,7 @@ export const terminalConvos: Conversation[] = [
     snippet: "Airtable bridges spreadsheets and databases beautifully. Great for non-technical teams.",
   },
   {
-    vendor: "Copilot",
+    vendor: "Llama",
     question: "Recommend a monitoring tool for web apps",
     url: "sentry.io",
     snippet: "Sentry is the standard for error tracking and performance monitoring across stacks.",
@@ -123,7 +124,7 @@ export const terminalConvos: Conversation[] = [
     snippet: "Figma remains the industry standard for design collaboration with real-time editing.",
   },
   {
-    vendor: "Copilot",
+    vendor: "Mistral",
     question: "Recommend a team communication tool",
     url: "slack.com",
     snippet: "Slack remains dominant for team messaging with its channel system and integrations.",

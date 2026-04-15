@@ -55,14 +55,6 @@ export function PerplexityIcon({ className = "h-4 w-4" }: { className?: string }
   );
 }
 
-export function CopilotIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" className={`${iconClass} ${className}`} fill="none">
-      <rect width="24" height="24" rx="12" fill="#0078D4"/>
-      <path d="M8 10c0-2.2 1.8-4 4-4s4 1.8 4 4v1h-2v-1c0-1.1-.9-2-2-2s-2 .9-2 2v4c0 1.1.9 2 2 2s2-.9 2-2v-1h2v1c0 2.2-1.8 4-4 4s-4-1.8-4-4v-4z" fill="#fff"/>
-    </svg>
-  );
-}
 
 export function MistralIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -97,7 +89,6 @@ export const MODEL_ICONS: Record<string, React.FC<{ className?: string }>> = {
   gemini: GeminiIcon,
   grok: GrokIcon,
   perplexity: PerplexityIcon,
-  copilot: CopilotIcon,
   mistral: MistralIcon,
   llama: LlamaIcon,
 };

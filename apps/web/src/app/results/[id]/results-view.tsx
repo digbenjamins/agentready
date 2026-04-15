@@ -72,7 +72,6 @@ interface Submission {
   website: string;
   score?: number | null;
   unlocked: boolean;
-  paymentConfirmed: boolean;
   mcdaReport?: McdaReport | null;
   mcdaStatus?: string | null;
   checks: Check[];
@@ -229,6 +228,15 @@ function ChecksByCategory({
 
 // ── MCDA Report Section ────────────────────────────────────
 
+/** Platform labels for citation matrix columns */
+const PLATFORM_LABELS: Record<string, { label: string; bg: string; text: string }> = {
+  gpt:        { label: "chatgpt.com",      bg: "bg-emerald-500/5", text: "text-emerald-400" },
+  claude:     { label: "claude.ai",        bg: "bg-amber-500/5",   text: "text-amber-400" },
+  gemini:     { label: "Google AI Search",  bg: "bg-blue-500/5",    text: "text-blue-400" },
+  grok:       { label: "x.com",            bg: "bg-neutral-500/5", text: "text-neutral-400" },
+  perplexity: { label: "perplexity.ai",    bg: "bg-cyan-500/5",    text: "text-cyan-400" },
+};
+
 /** Model label with icon */
 function ModelLabel({ modelKey, label, className = "text-xs" }: { modelKey: string; label: string; className?: string }) {
   const Icon = MODEL_ICONS[modelKey];
@@ -313,10 +321,10 @@ function McdaSection({ submission }: { submission: Submission }) {
       >
         <div className="flex items-center gap-3 mb-3">
           <Loader2 className="h-5 w-5 text-primary animate-spin" />
-          <p className="text-sm font-medium text-foreground">Generating your multi-AI citation report...</p>
+          <p className="text-sm font-medium text-foreground">Your multi-AI citation report is being generated</p>
         </div>
         <p className="text-xs text-muted-foreground">
-          We are querying 8 AI models (GPT, Claude, Gemini, Grok, Perplexity, Copilot, Mistral, Llama) with 10 real prompts in your niche. This takes about a minute.
+          We are querying 7 AI models (GPT, Claude, Gemini, Grok, Perplexity, Mistral, Llama) with 10 real prompts in your niche. You will receive an email with your full report access link once it is ready.
         </p>
       </motion.div>
     );
@@ -365,7 +373,7 @@ function McdaSection({ submission }: { submission: Submission }) {
         <div className="flex items-center gap-6 mb-4">
           <div className="text-center">
             <p className={`text-3xl font-bold tabular-nums ${summary.citedByCount >= 6 ? "text-primary" : summary.citedByCount >= 3 ? "text-amber-500" : "text-destructive/70"}`}>
-              {summary.citedByCount}<span className="text-lg text-muted-foreground font-normal">/8</span>
+              {summary.citedByCount}<span className="text-lg text-muted-foreground font-normal">/7</span>
             </p>
             <p className="text-[10px] text-muted-foreground">models cite you</p>
           </div>
@@ -385,7 +393,7 @@ function McdaSection({ submission }: { submission: Submission }) {
       {report.actionItems?.length > 0 && (
         <CollapsibleCard
           title="Action items"
-          subtitle={`${report.actionItems?.length ?? 0} improvements identified across 8 AI models`}
+          subtitle={`${report.actionItems?.length ?? 0} improvements identified across 7 AI models`}
           isOpen={openSections.has("actions")}
           onToggle={() => toggle("actions")}
         >
@@ -407,7 +415,7 @@ function McdaSection({ submission }: { submission: Submission }) {
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.description}</p>
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-[9px] font-mono text-muted-foreground/60">
-                          {item.agreedByCount}/8 models agree
+                          {item.agreedByCount}/7 models agree
                         </span>
                         <div className="flex items-center gap-1">
                           {[...new Set(item.models)].map((m) => {
@@ -437,11 +445,17 @@ function McdaSection({ submission }: { submission: Submission }) {
             <thead>
               <tr className="border-b border-border/30">
                 <th className="text-left px-5 py-2.5 font-medium text-muted-foreground w-[40%]">Query</th>
-                {models.map((m) => (
-                  <th key={m.id} className="text-center px-3 py-2.5 font-medium text-muted-foreground">
-                    <ModelLabel modelKey={m.id} label={m.label} className="text-[10px] justify-center" />
-                  </th>
-                ))}
+                {models.map((m) => {
+                  const platform = PLATFORM_LABELS[m.id];
+                  return (
+                    <th key={m.id} className={`text-center px-3 py-2.5 font-medium text-muted-foreground ${platform ? `relative ${platform.bg}` : ""}`}>
+                      <ModelLabel modelKey={m.id} label={m.label} className="text-[10px] justify-center" />
+                      {platform && (
+                        <span className={`block text-[8px] font-normal mt-0.5 ${platform.text}`}>{platform.label}</span>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -449,7 +463,7 @@ function McdaSection({ submission }: { submission: Submission }) {
                 <tr key={i} className="border-b border-border/20 last:border-b-0">
                   <td className="px-5 py-2.5 text-foreground leading-snug">{entry.query}</td>
                   {entry.results.map((r) => (
-                    <td key={r.model} className="text-center px-3 py-2.5">
+                    <td key={r.model} className={`text-center px-3 py-2.5 ${PLATFORM_LABELS[r.model]?.bg ?? ""}`}>
                       {r.cited ? (
                         <CheckCircle2 className="h-4 w-4 text-primary inline-block" />
                       ) : (
@@ -810,28 +824,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
       )}
 
       {/* Locked section (free tier) */}
-      {!submission.unlocked && submission.paymentConfirmed && (
-        <motion.div
-          className="rounded-xl border border-primary/20 bg-gradient-to-b from-card to-primary/[0.03] p-8 mb-10 text-center"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <CheckCircle2 className="h-8 w-8 text-primary mx-auto mb-3" />
-          <p className="text-lg font-semibold text-foreground mb-2">Payment confirmed</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            Check your email for the link to access your full Pro report. Your multi-AI citation report is being generated.
-          </p>
-          <Link
-            href="/resend"
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Didn&apos;t receive it? Resend the link
-          </Link>
-        </motion.div>
-      )}
-
-      {!submission.unlocked && !submission.paymentConfirmed && (
+      {!submission.unlocked && (
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 20 }}
@@ -903,7 +896,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
                 <BarChart3 className="h-5 w-5 text-muted-foreground mb-2" />
                 <p className="text-sm font-medium text-foreground">Multi-AI citation analysis</p>
                 <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed max-w-[220px]">
-                  We query 8 AI models with real prompts in your niche. Multi-signal scoring reveals which AI recommends you, which skips you, and why.
+                  We query 7 AI models with real prompts in your niche. Multi-signal scoring reveals which AI recommends you, which skips you, and why.
                 </p>
                 <p className="text-[10px] text-primary font-medium mt-1.5">Pro only</p>
               </div>
@@ -967,7 +960,7 @@ export function ResultsView({ submission }: { submission: Submission }) {
                 {[
                   { label: `All ${totalChecks} checks with detailed explanation`, highlight: false },
                   { label: "Fix instructions per failed check", highlight: false },
-                  { label: "Multi-AI citation report across 8 models", highlight: true },
+                  { label: "Multi-AI citation report across 7 models", highlight: true },
                   { label: "Competitive benchmark vs. cited competitors", highlight: true },
                   { label: "Prioritized fix roadmap", highlight: false },
                   { label: "AI-rewritten homepage copy", highlight: false },

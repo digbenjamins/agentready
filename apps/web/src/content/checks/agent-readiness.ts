@@ -22,7 +22,7 @@ export const agentReadinessChecks: CheckEntry[] = [
           },
           {
             type: "p",
-            text: "AI crawlers from ChatGPT, Claude, Perplexity, Gemini and Copilot are starting to look for this file the same way search engines look for robots.txt. When they find one, they get a clean, authoritative summary of your product without having to infer it from marketing copy or navigation elements.",
+            text: "AI crawlers from ChatGPT, Claude, Perplexity and Gemini are starting to look for this file the same way search engines look for robots.txt. When they find one, they get a clean, authoritative summary of your product without having to infer it from marketing copy or navigation elements.",
           },
         ],
       },

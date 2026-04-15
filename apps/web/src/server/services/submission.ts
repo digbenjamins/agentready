@@ -10,24 +10,53 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-export function verifyUnlockCode(storedHash: string | null, code: string): boolean {
-  if (!storedHash) return false;
+export function verifyUnlockCode(stored: string | null, code: string): boolean {
+  if (!stored) return false;
+  // Try hash comparison first (code is hashed after MCDA completes)
   const candidate = hashToken(code);
-  if (storedHash.length !== candidate.length) return false;
-  return crypto.timingSafeEqual(Buffer.from(storedHash), Buffer.from(candidate));
+  if (stored.length === candidate.length) {
+    if (crypto.timingSafeEqual(Buffer.from(stored), Buffer.from(candidate))) {
+      return true;
+    }
+  }
+  // Try direct comparison (code is stored raw before MCDA completes)
+  if (stored.length === code.length) {
+    return crypto.timingSafeEqual(Buffer.from(stored), Buffer.from(code));
+  }
+  return false;
 }
 
 /**
  * Generates an unlock code for a paid submission.
- * Stores the hash, returns the raw token for the email link.
+ * Stores the raw token so it can be read later for emails.
+ * Call hashUnlockCode() after the final email is sent.
  */
 export async function generateUnlockCode(submissionId: string): Promise<string> {
   const token = generateToken();
   await prisma.submission.update({
     where: { id: submissionId },
-    data: { passcode: hashToken(token) },
+    data: { passcode: token },
   });
   return token;
+}
+
+/**
+ * Hashes the stored raw code in place for long-term security.
+ * Call this after the final email has been sent.
+ */
+export async function hashUnlockCode(submissionId: string): Promise<void> {
+  const submission = await prisma.submission.findUnique({
+    where: { id: submissionId },
+    select: { passcode: true },
+  });
+  if (!submission?.passcode) return;
+  // Don't double-hash: if it's already hashed, skip
+  const hashed = hashToken(submission.passcode);
+  if (submission.passcode === hashed) return;
+  await prisma.submission.update({
+    where: { id: submissionId },
+    data: { passcode: hashed },
+  });
 }
 
 export async function createSubmission(website: string, email?: string) {

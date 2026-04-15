@@ -2,8 +2,6 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { stripe } from "@/server/stripe";
 import { prisma } from "@/lib/prisma";
 import { generateMcdaReport } from "@/server/services/mcda";
-import { generateUnlockCode } from "@/server/services/submission";
-import { sendProReportEmail } from "@/server/email";
 
 const MAX_WEBHOOK_BODY = 64 * 1024; // 64KB, Stripe payloads are typically <10KB
 
@@ -41,40 +39,31 @@ export async function POST(req: NextRequest) {
     const submissionId = session.metadata?.submissionId;
 
     if (submissionId) {
-      // Idempotency: skip if already processed
       const existing = await prisma.submission.findUnique({
         where: { id: submissionId },
-        select: { pro: true, email: true, passcode: true, mcdaStatus: true, website: true },
+        select: { pro: true, email: true, mcdaStatus: true, website: true },
       });
 
-      if (!existing || existing.pro) {
+      if (!existing) {
         return NextResponse.json({ received: true });
       }
 
-      const customerEmail = session.customer_details?.email ?? null;
+      // Mark as pro if the return URL hasn't done it yet
+      if (!existing.pro) {
+        const customerEmail = session.customer_details?.email ?? null;
+        const emailData = customerEmail && !existing.email
+          ? { email: customerEmail, emailVerified: true }
+          : {};
 
-      // Only set email if submission doesn't already have one
-      const emailData = customerEmail && !existing.email
-        ? { email: customerEmail, emailVerified: true }
-        : {};
-
-      await prisma.submission.update({
-        where: { id: submissionId },
-        data: { pro: true, paidAt: new Date(), ...emailData },
-      });
+        await prisma.submission.update({
+          where: { id: submissionId },
+          data: { pro: true, paidAt: new Date(), ...emailData },
+        });
+      }
 
       // Kick off MCDA report generation (runs after response is sent)
       if (!existing.mcdaStatus) {
         after(() => generateMcdaReport(submissionId, existing.website).catch(console.error));
-      }
-
-      // Generate unlock code and send the Pro report access email
-      if (customerEmail) {
-        after(() =>
-          generateUnlockCode(submissionId)
-            .then((code) => sendProReportEmail(customerEmail, submissionId, code))
-            .catch(console.error),
-        );
       }
     }
   }
