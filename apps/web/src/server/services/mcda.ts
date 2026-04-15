@@ -1,6 +1,7 @@
 import { queryModel, MODELS, SYNTHESIS_MODEL, ANALYSIS_MODEL, type ModelKey, runWithConcurrency, createDeadline } from "../openrouter";
 import { fetchUrl, extractBodyText } from "../utils";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { hashUnlockCode } from "./submission";
 import { sendReportReadyEmail } from "../email";
 
@@ -582,7 +583,7 @@ export async function generateMcdaReport(submissionId: string, websiteUrl: strin
     await prisma.submission.update({
       where: { id: submissionId },
       data: {
-        mcdaReport: sanitizeForJson(report) as Record<string, unknown>,
+        mcdaReport: sanitizeForJson(report) as unknown as Prisma.InputJsonValue,
         mcdaStatus: "completed",
       },
     });
