@@ -31,8 +31,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
   }
 
+  const contentLength = parseInt(req.headers.get("content-length") || "0", 10);
+  if (contentLength > 1024) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  }
+
   const { password } = await req.json();
-  if (!password || typeof password !== "string") {
+  if (!password || typeof password !== "string" || password.length > 256) {
     return NextResponse.json({ error: "Password is required" }, { status: 400 });
   }
 
@@ -61,5 +66,17 @@ export async function POST(req: NextRequest) {
   globalThis.__adminSessions = globalThis.__adminSessions || new Set();
   (globalThis.__adminSessions as Set<string>).add(sessionToken);
 
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE() {
+  const cookieStore = await cookies();
+  const session = cookieStore.get("admin_session");
+
+  if (session && globalThis.__adminSessions) {
+    (globalThis.__adminSessions as Set<string>).delete(session.value);
+  }
+
+  cookieStore.delete("admin_session");
   return NextResponse.json({ success: true });
 }

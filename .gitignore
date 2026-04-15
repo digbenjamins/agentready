@@ -30,3 +30,4 @@ npm-debug.log*
 .turbo
 
 /plans
+.claude/settings.local.json

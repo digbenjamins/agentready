@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addEmailToSubmission } from "@/server/services/submission";
-import { generateMcdaReport } from "@/server/services/mcda";
-import { sendPasscodeEmail } from "@/server/email";
 import { validateEmail, checkRateLimit, getClientIp, parseJsonBody } from "@/server/security";
-import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid or oversized request body" }, { status: 400 });
   }
 
-  // Honeypot: bots fill this hidden field, real users never do
+  // Honeypot
   if (body.company) {
     return NextResponse.json({ ok: true });
   }
@@ -37,31 +34,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "A valid email address is required" }, { status: 400 });
   }
 
-  let token: string;
   try {
-    const result = await addEmailToSubmission(submissionId, email);
-    token = result.token;
+    await addEmailToSubmission(submissionId, email);
   } catch {
     return NextResponse.json(
-      { error: "An email is already registered for this report. Check your inbox or use the resend page." },
+      { error: "An email is already registered for this report." },
       { status: 409 },
     );
-  }
-
-  try {
-    await sendPasscodeEmail(email, token, submissionId);
-  } catch (err) {
-    console.error("Failed to send email:", err);
-    return NextResponse.json({ error: "Failed to send email, please try again" }, { status: 500 });
-  }
-
-  // Start MCDA generation in background so it's ready when they unlock
-  const submission = await prisma.submission.findUnique({
-    where: { id: submissionId },
-    select: { website: true, mcdaStatus: true },
-  });
-  if (submission && !submission.mcdaStatus) {
-    generateMcdaReport(submissionId, submission.website).catch(console.error);
   }
 
   return NextResponse.json({ ok: true });

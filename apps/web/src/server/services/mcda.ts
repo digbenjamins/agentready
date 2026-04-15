@@ -172,8 +172,12 @@ async function getImpactAnalysis(
 
   const response = await queryModel(MODELS[modelKey].id, [
     {
+      role: "system",
+      content: "You are a research analyst writing a technical report. Write in a neutral, evidence-based tone. Cite specific data points from the provided answers. Do not offer to help, do not add disclaimers, do not use filler phrases. No introductions or conclusions. Just findings.",
+    },
+    {
       role: "user",
-      content: `Based on these answers, what do you notice are major impacts of the suggestions?\n\n${truncated}`,
+      content: `Analyze the following AI-generated answers for a website discoverability audit. Identify what ranking signals, content patterns, and authority indicators this AI model prioritizes when recommending sites. Structure your findings as bullet points grouped by signal type (content, technical, authority, local).\n\n${truncated}`,
     },
   ]);
 
@@ -195,8 +199,12 @@ async function getSuggestabilityReport(
 
   const response = await queryModel(MODELS[modelKey].id, [
     {
+      role: "system",
+      content: "You are a research analyst writing a technical report. Write in a neutral, evidence-based tone. Reference specific queries and responses as evidence. Do not offer to help, do not add disclaimers or sign-offs, do not use phrases like 'feel free to' or 'let me know'. No introductions. Just analysis.",
+    },
+    {
       role: "user",
-      content: `Based on these 10 queries and their results, provide a full report on why these sites were suggested and how ${websiteUrl} could improve its suggestability in this niche.\n\n${truncated}`,
+      content: `Analyze the following 10 queries and their results for ${websiteUrl}. For each cited competitor, explain what specific signals (structured data, content depth, backlink authority, local presence, niche expertise) likely caused this model to recommend them. Then identify the gaps between ${websiteUrl} and the top-cited sites. Structure as: 1) Competitor analysis (why they were cited), 2) Gap analysis (what ${websiteUrl} lacks), 3) Signal-specific recommendations.\n\n${truncated}`,
     },
   ]);
 
@@ -437,11 +445,12 @@ ${reportBlock}`,
 // ── Main entry point ───────────────────────────────────────
 
 export async function generateMcdaReport(submissionId: string, websiteUrl: string): Promise<void> {
-  // Mark as processing
-  await prisma.submission.update({
-    where: { id: submissionId },
+  // Atomically claim processing status to prevent double-trigger
+  const claimed = await prisma.submission.updateMany({
+    where: { id: submissionId, mcdaStatus: null },
     data: { mcdaStatus: "processing" },
   });
+  if (claimed.count === 0) return; // Another call already claimed it
 
   try {
     // Fetch page text for query generation

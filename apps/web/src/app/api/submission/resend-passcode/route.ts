@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resendTokenByEmailAndWebsite } from "@/server/services/submission";
-import { sendPasscodeEmail } from "@/server/email";
 import { checkRateLimit, getClientIp, parseJsonBody } from "@/server/security";
+import { sendProReportEmail } from "@/server/email";
+import { generateUnlockCode } from "@/server/services/submission";
+import { prisma } from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   const ip = getClientIp(req);
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  // Honeypot: bots fill this hidden field, real users never do
+  // Honeypot
   if (body.company) {
     return NextResponse.json({ ok: true });
   }
@@ -34,15 +35,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Website is required" }, { status: 400 });
   }
 
-  const result = await resendTokenByEmailAndWebsite(email, website);
+  // Normalize website for lookup
+  let normalized = website.trim().toLowerCase();
+  if (!normalized.startsWith("http://") && !normalized.startsWith("https://")) {
+    normalized = "https://" + normalized;
+  }
+  normalized = normalized.replace(/\/$/, "");
+
+  const submission = await prisma.submission.findFirst({
+    where: {
+      email,
+      website: normalized,
+      pro: true,
+    },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   // Always return success to avoid leaking whether a report exists
-  if (result) {
-    try {
-      await sendPasscodeEmail(result.email, result.token, result.submissionId);
-    } catch (err) {
-      console.error("Failed to resend email:", err);
-    }
+  if (submission) {
+    generateUnlockCode(submission.id)
+      .then((code) => sendProReportEmail(email, submission.id, code))
+      .catch(console.error);
   }
 
   return NextResponse.json({ ok: true });

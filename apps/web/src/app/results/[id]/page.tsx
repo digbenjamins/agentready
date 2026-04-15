@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { getSubmissionWithChecks, verifyUnlockToken, markEmailVerified } from "@/server/services/submission";
-import { generateMcdaReport } from "@/server/services/mcda";
+import { getSubmissionWithChecks, verifyUnlockCode } from "@/server/services/submission";
+import { verifyStripePayment } from "@/server/services/payment";
 import { ResultsView } from "./results-view";
 
 interface DbCheck {
@@ -53,27 +53,33 @@ export default async function ResultsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ code?: string }>;
+  searchParams: Promise<{ code?: string; session_id?: string }>;
 }) {
   const { id } = await params;
-  const { code } = await searchParams;
+  const { code, session_id } = await searchParams;
   const submission = await getSubmissionWithChecks(id);
 
   if (!submission || submission.status !== "completed") {
     notFound();
   }
 
-  // Unlock via email token
-  const unlockedByCode = !!code && verifyUnlockToken(submission.passcode, code);
-  const isUnlocked = unlockedByCode;
+  // Unlock via secret code in URL (sent by email after payment)
+  const unlockedByCode = !!code && submission.pro && verifyUnlockCode(submission.passcode, code);
 
-  // On first valid email access, mark the email as verified
-  if (unlockedByCode && !submission.emailVerified) {
-    await markEmailVerified(id);
-    if (!submission.mcdaStatus) {
-      generateMcdaReport(id, submission.website).catch(console.error);
+  // Stripe return URL — verify payment, generate code, redirect with code in URL
+  let paymentConfirmed = false;
+  if (!unlockedByCode && session_id) {
+    const unlockCode = await verifyStripePayment(id, session_id);
+    if (unlockCode) {
+      redirect(`/results/${id}?code=${unlockCode}`);
+    }
+    // If null, webhook already processed. User should check their email.
+    if (submission.pro) {
+      paymentConfirmed = true;
     }
   }
+
+  const isUnlocked = unlockedByCode;
 
   const checks = isUnlocked
     ? submission.checks.map((c) => ({ ...c, revealed: true as const }))
@@ -117,7 +123,7 @@ export default async function ResultsPage({
     website: submission.website,
     score: submission.score,
     unlocked: isUnlocked,
-    hasEmail: !!submission.email,
+    paymentConfirmed,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mcdaReport: isUnlocked ? (submission.mcdaReport as any) : null,
     mcdaStatus: isUnlocked ? submission.mcdaStatus : null,

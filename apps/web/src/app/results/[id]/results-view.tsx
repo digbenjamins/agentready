@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, AlertCircle, Lock, ArrowRight, Loader2, Mail, Sparkles, BarChart3, ChevronDown } from "lucide-react";
+import { CheckCircle2, XCircle, AlertCircle, Lock, ArrowRight, Loader2, Sparkles, BarChart3, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { MODEL_ICONS } from "@/components/model-icons";
 import Link from "next/link";
 
@@ -73,7 +72,7 @@ interface Submission {
   website: string;
   score?: number | null;
   unlocked: boolean;
-  hasEmail: boolean;
+  paymentConfirmed: boolean;
   mcdaReport?: McdaReport | null;
   mcdaStatus?: string | null;
   checks: Check[];
@@ -411,7 +410,7 @@ function McdaSection({ submission }: { submission: Submission }) {
                           {item.agreedByCount}/8 models agree
                         </span>
                         <div className="flex items-center gap-1">
-                          {item.models.map((m) => {
+                          {[...new Set(item.models)].map((m) => {
                             const Icon = MODEL_ICONS[m];
                             return Icon ? <Icon key={m} className="h-3 w-3" /> : null;
                           })}
@@ -644,10 +643,6 @@ function McdaSection({ submission }: { submission: Submission }) {
 }
 
 export function ResultsView({ submission }: { submission: Submission }) {
-  const [emailInput, setEmailInput] = useState("");
-  const [emailSaving, setEmailSaving] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
-  const [emailError, setEmailError] = useState("");
   const { visibilityScore, discoverabilityScore, totalChecks, categoryScores } = submission.stats;
 
   // Server already gated: revealed checks have full data, others are stripped
@@ -659,32 +654,6 @@ export function ResultsView({ submission }: { submission: Submission }) {
   const quickFix = revealed.filter((c) => !c.passed).slice(3, 4);
   const totalFailed = submission.checks.filter((c) => !c.passed).length;
 
-  async function handleEmailSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!emailInput.trim()) return;
-    // Honeypot check
-    const form = e.target as HTMLFormElement;
-    const hp = (form.querySelector('[name="company"]') as HTMLInputElement)?.value;
-    if (hp) return;
-
-    setEmailSaving(true);
-    setEmailError("");
-    try {
-      const res = await fetch("/api/submission/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionId: submission.id, email: emailInput }),
-      });
-      if (res.ok) {
-        setEmailSent(true);
-      } else {
-        const data = await res.json();
-        setEmailError(data.error || "Something went wrong, please try again.");
-      }
-    } finally {
-      setEmailSaving(false);
-    }
-  }
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-12">
@@ -841,7 +810,28 @@ export function ResultsView({ submission }: { submission: Submission }) {
       )}
 
       {/* Locked section (free tier) */}
-      {!submission.unlocked && (
+      {!submission.unlocked && submission.paymentConfirmed && (
+        <motion.div
+          className="rounded-xl border border-primary/20 bg-gradient-to-b from-card to-primary/[0.03] p-8 mb-10 text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <CheckCircle2 className="h-8 w-8 text-primary mx-auto mb-3" />
+          <p className="text-lg font-semibold text-foreground mb-2">Payment confirmed</p>
+          <p className="text-sm text-muted-foreground mb-4">
+            Check your email for the link to access your full Pro report. Your multi-AI citation report is being generated.
+          </p>
+          <Link
+            href="/resend"
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Didn&apos;t receive it? Resend the link
+          </Link>
+        </motion.div>
+      )}
+
+      {!submission.unlocked && !submission.paymentConfirmed && (
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 20 }}
@@ -1001,7 +991,24 @@ export function ResultsView({ submission }: { submission: Submission }) {
               </p>
             </div>
 
-            <Button className="w-full h-11 gap-2 text-sm font-medium">
+            <Button
+              className="w-full h-11 gap-2 text-sm font-medium cursor-pointer hover:opacity-90 hover:scale-[1.01] active:scale-[0.99] transition-all"
+              onClick={async () => {
+                try {
+                  const res = await fetch("/api/checkout", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ submissionId: submission.id }),
+                  });
+                  const data = await res.json();
+                  if (data.url) {
+                    window.location.href = data.url;
+                  }
+                } catch (err) {
+                  console.error("Checkout failed:", err);
+                }
+              }}
+            >
               Unlock full audit — <span className="line-through opacity-60">&euro;29</span> &euro;19
               <ArrowRight className="h-4 w-4" />
             </Button>
@@ -1018,68 +1025,6 @@ export function ResultsView({ submission }: { submission: Submission }) {
       {/* MCDA Report (Pro only) */}
       {submission.unlocked && <McdaSection submission={submission} />}
 
-      {/* Email unlock */}
-      {!submission.unlocked && (
-        <motion.div
-          className="rounded-xl border border-border/60 bg-secondary/20 p-6 mb-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.35 }}
-        >
-          {submission.hasEmail || emailSent ? (
-            <>
-              <div className="flex items-center gap-2 mb-3">
-                <Mail className="h-4 w-4 text-primary" />
-                <p className="text-sm font-medium text-foreground">
-                  Check your email to unlock the full report
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground mb-2">
-                We sent a link to your email. Click it to unlock all {submission.stats.totalChecks} checks with detailed fixes.
-              </p>
-              <div className="flex items-center gap-2 mb-4 text-xs text-primary">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <p>Your multi-AI citation report is already being generated across 8 models.</p>
-              </div>
-              <Link
-                href="/resend"
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Didn&apos;t get it? Resend the email
-              </Link>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-2 mb-3">
-                <Lock className="h-4 w-4 text-muted-foreground" />
-                <p className="text-sm font-medium text-foreground">
-                  Unlock your full report
-                </p>
-              </div>
-              <p className="text-xs text-muted-foreground mb-4">
-                Enter your email to get an unlock link and reveal all {submission.stats.totalChecks} checks with detailed fixes. No spam.
-              </p>
-              <form onSubmit={handleEmailSubmit} className="flex gap-2">
-                <input type="text" name="company" autoComplete="off" tabIndex={-1} aria-hidden="true" className="absolute opacity-0 h-0 w-0 overflow-hidden pointer-events-none" />
-                <Input
-                  type="email"
-                  placeholder="you@company.com"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  required
-                  className="h-10 flex-1 bg-background/60"
-                />
-                <Button type="submit" size="sm" variant="outline" className="h-10 px-4 shrink-0" disabled={emailSaving}>
-                  {emailSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send link"}
-                </Button>
-              </form>
-              {emailError && (
-                <p className="text-xs text-red-500 mt-2">{emailError}</p>
-              )}
-            </>
-          )}
-        </motion.div>
-      )}
 
       {/* Knowledge base link */}
       <motion.div
@@ -1099,6 +1044,18 @@ export function ResultsView({ submission }: { submission: Submission }) {
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
       </motion.div>
+
+      {/* Footer disclaimer */}
+      <div className="mt-10 pt-6 border-t border-border/30 space-y-3 pb-8">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+          <Link href="/terms" className="hover:text-muted-foreground transition-colors">Terms of Service</Link>
+          <span>·</span>
+          <Link href="/privacy" className="hover:text-muted-foreground transition-colors">Privacy Policy</Link>
+        </div>
+        <p className="text-[10px] text-muted-foreground/40 text-center max-w-lg mx-auto leading-relaxed">
+          Parts of this report are generated by AI models and are provided for informational purposes only. Results may vary between scans due to the non-deterministic nature of AI. We do not guarantee the accuracy or completeness of AI-generated findings.
+        </p>
+      </div>
     </div>
   );
 }

@@ -136,11 +136,15 @@ export function extractBodyText(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   if (bodyMatch) body = bodyMatch[1];
 
-  // Remove script and style tags
+  // Remove script, style, nav, footer tags
   body = body.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "");
   body = body.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
   body = body.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, "");
   body = body.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, "");
+  // Remove hidden elements (display:none, visibility:hidden, aria-hidden, font-size:0)
+  body = body.replace(/<[^>]+(?:display\s*:\s*none|visibility\s*:\s*hidden|aria-hidden\s*=\s*["']true["']|font-size\s*:\s*0)[^>]*>[\s\S]*?<\/[^>]+>/gi, "");
+  // Remove HTML comments
+  body = body.replace(/<!--[\s\S]*?-->/g, "");
   // Remove all tags
   body = body.replace(/<[^>]*>/g, " ");
   // Collapse whitespace
