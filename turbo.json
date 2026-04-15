@@ -3,6 +3,16 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "DATABASE_URL",
+        "DIRECT_URL",
+        "ANTHROPIC_API_KEY",
+        "RESEND_API_KEY",
+        "OPENROUTER_API_KEY",
+        "STRIPE_SECRET_KEY",
+        "STRIPE_PRICE_ID",
+        "STRIPE_WEBHOOK_SECRET"
+      ],
       "outputs": [".next/**", "!.next/cache/**"]
     },
     "dev": {
